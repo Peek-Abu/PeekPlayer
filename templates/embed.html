@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeekPlayer - Embedded Video Player</title>
+    <link rel="stylesheet" href="{{CSS_PATH}}">
+    <style>
+        html, body {
+            margin: 0;
+            padding: 0;
+            height: 100%;
+            overflow: hidden;
+            background: #000;
+        }
+
+        body {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+
+        #player-wrapper {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            background: #000;
+        }
+
+        #peek-video {
+            width: 100%;
+            height: 100%;
+            object-fit: contain;
+        }
+
+        .error-message {
+            color: white;
+            font-size: 18px;
+            text-align: center;
+            padding: 20px;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+        }
+
+        /* Notification system for quality changes */
+        .notification {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.9);
+            color: white;
+            padding: 12px 20px;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 500;
+            z-index: 10000;
+            opacity: 0;
+            transform: translateX(100%);
+            transition: all 0.3s ease;
+        }
+
+        .notification.show {
+            opacity: 1;
+            transform: translateX(0);
+        }
+
+        .notification.success {
+            border-left: 4px solid #00ff88;
+        }
+
+        .notification.loading {
+            border-left: 4px solid #ffa500;
+        }
+
+        .notification.error {
+            border-left: 4px solid #ff4444;
+        }
+    </style>
+</head>
+<body>
+    <div id="player-wrapper">
+        <video id="peek-video" preload="auto" crossorigin=""></video>
+        <div id="custom-controls"></div>
+        <div id="overlay-container"></div>
+    </div>
+
+    <!-- Load HLS.js v1.5.20 for better codec compatibility -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
+    
+    <!-- Load PeekPlayer embed bundle -->
+    <script src="{{JS_PATH}}"></script>
+</body>
+</html>

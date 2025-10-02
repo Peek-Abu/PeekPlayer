@@ -1,0 +1,47 @@
+{
+  "name": "@peekabu/peekplayer",
+  "version": "1.0.0",
+  "type": "module",
+  "description": "Professional HTML5 video player with HLS support, custom controls, and multi-quality streaming",
+  "main": "dist/peekplayer.js",
+  "module": "src/core/player.js",
+  "types": "dist/peekplayer.d.ts",
+  "files": [
+    "dist/",
+    "src/",
+    "style.css",
+    "templates/",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "rollup -c",
+    "dev": "rollup -c -w",
+    "serve": "http-server . -p 3001 -c-1",
+    "prepare": "npm run build"
+  },
+  "keywords": [
+    "video-player",
+    "hls",
+    "streaming",
+    "html5-video",
+    "custom-controls"
+  ],
+  "author": "peekabu",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/peekabu/peekplayer.git"
+  },
+  "dependencies": {
+    "hls.js": "1.5.20"
+  },
+  "devDependencies": {
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "rollup": "^4.9.6",
+    "http-server": "^14.1.1"
+  },
+  "peerDependencies": {
+    "hls.js": ">=1.5.20"
+  }
+}

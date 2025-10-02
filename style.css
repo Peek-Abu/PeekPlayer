@@ -1,0 +1,648 @@
+body {
+  background: #111;
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#player-wrapper {
+  position: relative;
+  width: 100%;
+  background: #222;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px #000a;
+  /* aspect-ratio: 16 / 9;  ✅ Maintains video ratio */
+  /* overflow: hidden;       ✅ Prevents control overflow */
+}
+
+video {
+  width: 100%;
+  background: #000;
+  border-radius: 8px;
+  display: block;
+}
+
+.scrubber-row {
+  display: flex;
+  align-items: center;
+  /* margin-bottom: 2px; */
+  position: relative;
+  padding: 4px 0; /* Add padding for easier hover target */
+}
+
+.scrubber {
+  flex: 1;
+  appearance: none;
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.22);
+  outline: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  position: relative;
+  
+  /* Custom properties for buffered progress */
+  --buffered-width: 0%;
+  --progress-width: 0%;
+}
+
+/* Hover effect - make track taller and more visible */
+.scrubber:hover,
+.scrubber.scrubber--hover {
+  /* height: 6px; */
+  background: rgba(255,255,255,0.3);
+}
+
+/* Buffered progress background */
+/* .scrubber::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--buffered-width);
+  background: rgba(255,255,255,1);
+  border-radius: inherit;
+  pointer-events: none;
+  transition: all 0.2s ease;
+} */
+
+/* Layer 1: Buffered progress (loaded content) */
+.scrubber::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--buffered-width);
+  background: rgba(255, 255, 255, 1); /* Medium opacity for buffered */
+  border-radius: inherit;
+  pointer-events: none;
+  transition: width 0.3s ease;
+  z-index: 2;
+}
+
+/* Layer 2: Current progress (played content) */
+.scrubber::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--progress-width);
+  background: rgba(255, 255, 255, 0.2); /* Medium opacity for buffered */
+  border-radius: inherit;
+  pointer-events: none;
+  transition: width 0.1s ease;
+  z-index: 1;
+}
+
+/* Remove default webkit progress styling */
+.scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: transparent; /* Make transparent so our custom layers show */
+}
+
+.scrubber:hover::-webkit-slider-runnable-track {
+  background: transparent;
+}
+
+/* Progress fill (current time) */
+.scrubber::-webkit-slider-thumb {
+  appearance: none;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  margin-top: -4px;
+}
+
+/* Show thumb on hover */
+.scrubber:hover::-webkit-slider-thumb,
+.scrubber.scrubber--hover::-webkit-slider-thumb {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Firefox thumb styling */
+.scrubber::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  opacity: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.scrubber:hover::-moz-range-thumb,
+.scrubber.scrubber--hover::-moz-range-thumb {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Firefox track styling */
+.scrubber::-moz-range-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.22);
+  border: none;
+}
+
+.scrubber:hover::-moz-range-track {
+  height: 6px;
+  background: rgba(255,255,255,0.3);
+}
+
+/* Progress fill for webkit browsers */
+.scrubber::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.22);
+}
+
+.scrubber:hover::-webkit-slider-runnable-track {
+  height: 6px;
+  background: rgba(255,255,255,0.3);
+}
+
+.controls-row {
+  display: flex;
+  align-items: center;
+  padding: 6px 4px;
+}
+
+#custom-controls {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  width: 100%; /* Ensure it matches wrapper width */
+  box-sizing: border-box; /* Include padding in width calculation */
+}
+
+/* Time Display Component */
+.time-display {
+  display: flex;
+  align-items: center;
+  margin: 0px;
+  font-weight: 500;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 13px;
+  color: #fff;
+  user-select: none;
+  white-space: nowrap;
+  transition: transform 0.3s ease; /* Add this line */
+}
+
+.current-time {
+  min-width: 35px;
+  text-align: right;
+}
+
+.time-separator {
+  margin: 0 2px;
+}
+
+.total-time {
+  min-width: 35px;
+}
+
+/* Button Base Styles */
+.skip-button,
+.play-toggle-button,
+.skip-button,
+.mute-button,
+.fullscreen-button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.skip-button:hover,
+.play-toggle-button:hover,
+.skip-button:hover,
+.mute-button:hover,
+.fullscreen-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+/* Remove focus styles for all buttons */
+button:focus {
+  outline: none;
+}
+
+/* Icon Sizing */
+.play-toggle-icon,
+.skip-icon,
+.volume-icon,
+.fullscreen-icon,
+.pip-icon {
+  width: 24px;
+  height: 24px;
+  fill: currentColor;
+}
+
+/* Volume Control */
+.volume-control {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.volume-popup {
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+  transition: width 0.3s ease, opacity 0.2s ease;
+  pointer-events: auto;
+  width: 0px;
+  height: 10px;
+}
+
+.volume-slider {
+  appearance: none;
+  width: 60px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.3);
+  border-radius: 2px;
+  outline: none;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+/* Volume slider hover effect */
+.volume-slider:hover {
+  background: rgba(255, 255, 255, 0.4);
+}
+
+/* Volume slider thumb - hidden by default */
+.volume-slider::-webkit-slider-thumb {
+  appearance: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  opacity: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  /* margin-top: 4px; */
+}
+
+/* Show thumb on hover */
+.volume-slider:hover::-webkit-slider-thumb {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Firefox thumb styling */
+.volume-slider::-moz-range-thumb {
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: #fff;
+  cursor: pointer;
+  border: none;
+  opacity: 0;
+  transition: all 0.2s ease;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+}
+
+.volume-slider:hover::-moz-range-thumb {
+  opacity: 1;
+  transform: scale(1.1);
+}
+
+/* Paused Overlay with Vignette Effect */
+#overlay-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: 10;
+}
+
+#overlay-container.visible {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+.paused-vignette {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: radial-gradient(
+    ellipse at center,
+    rgba(0, 0, 0, 0.1) 0%,
+    rgba(0, 0, 0, 0.3) 50%,
+    rgba(0, 0, 0, 0.6) 100%
+  );
+  pointer-events: none;
+}
+
+.paused-play-button {
+  background: rgba(0, 0, 0, 0.8);
+  border: 3px solid rgba(255, 255, 255, 0.9);
+  border-radius: 50%;
+  width: 80px;
+  height: 80px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  backdrop-filter: blur(10px);
+  color: white;
+  z-index: 11;
+}
+
+.paused-play-button:hover {
+  background: rgba(0, 0, 0, 0.9);
+  border-color: #fff;
+  transform: scale(1.1);
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.3);
+}
+
+.paused-play-icon {
+  width: 32px;
+  height: 32px;
+  color: #fff;
+  margin-left: 4px; /* Slight offset for visual centering */
+}
+/* Add styles for controls, overlays, etc */
+
+/* Picture-in-Picture Button */
+.pip-button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: auto;
+}
+
+.pip-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  transform: scale(1.05);
+}
+
+.pip-button:focus {
+  outline: none;
+}
+
+/* Tooltip System */
+.tooltip {
+  position: fixed;
+  background: rgba(0, 0, 0, 0.9);
+  color: #fff;
+  padding: 6px 10px;
+  border-radius: 4px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  white-space: nowrap;
+  z-index: 1000;
+  opacity: 0;
+  transform: translateY(4px);
+  transition: all 0.2s ease;
+  pointer-events: none;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+}
+
+.tooltip--visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.tooltip--top {
+  transform-origin: bottom center;
+}
+
+.tooltip--bottom {
+  transform-origin: top center;
+}
+
+.tooltip--left {
+  transform-origin: right center;
+}
+
+.tooltip--right {
+  transform-origin: left center;
+}
+
+/* Tooltip arrows */
+.tooltip::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border: 4px solid transparent;
+}
+
+.tooltip--top::before {
+  bottom: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-top-color: rgba(0, 0, 0, 0.9);
+}
+
+.tooltip--bottom::before {
+  top: -8px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-bottom-color: rgba(0, 0, 0, 0.9);
+}
+
+.tooltip--left::before {
+  right: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-left-color: rgba(0, 0, 0, 0.9);
+}
+
+.tooltip--right::before {
+  left: -8px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-right-color: rgba(0, 0, 0, 0.9);
+}
+
+/* Enhanced tooltip for scrubber with thumbnails */
+.tooltip--scrubber {
+  padding: 0;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 6px;
+  overflow: hidden;
+  min-width: 160px;
+}
+
+.tooltip__thumbnail {
+  width: 160px;
+  height: 90px;
+  background-size: cover;
+  background-position: center;
+  background-color: rgba(255, 255, 255, 0.1);
+  display: none;
+  border-radius: 4px 4px 0 0;
+}
+
+.tooltip__time {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  text-align: center;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 0 0 4px 4px;
+}
+
+/* Larger arrow for scrubber tooltip */
+.tooltip--scrubber::before {
+  border-width: 6px;
+  bottom: -12px;
+  border-top-color: rgba(0, 0, 0, 0.9);
+}
+
+/* Quality Selector Component */
+.quality-selector {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.quality-button {
+  background: none;
+  border: none;
+  color: #fff;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: background-color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.quality-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.quality-icon {
+  width: 20px;
+  height: 20px;
+}
+
+.quality-menu {
+  position: absolute;
+  bottom: 100%;
+  right: 50%; 
+  transform: translateX(50%);
+  margin-bottom: 8px;
+  background: rgba(0, 0, 0, 0.9);
+  border-radius: 6px;
+  padding: 4px 0;
+  min-width: 80px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  z-index: 1000;
+}
+
+.quality-option {
+  display: block;
+  width: 100%;
+  background: none;
+  border: none;
+  color: #fff;
+  padding: 8px 16px;
+  text-align: left;
+  cursor: pointer;
+  font-size: 14px;
+  transition: background-color 0.2s;
+}
+
+.quality-option:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.quality-option.selected {
+  background: rgba(255, 255, 255, 0.2);
+  color: #00ff88;
+}
+
+.quality-option.selected::after {
+  content: ' ✓';
+  float: right;
+}
+/* Mobile-first responsive design */
+@media (max-width: 768px) {
+  .controls-row {
+    display: grid;
+    grid-template-columns: auto 1fr auto auto;
+    gap: 8px;
+    align-items: center;
+    padding: 8px 12px;
+  }
+  
+  /* Hide non-essential controls on mobile */
+  .skip-button,
+  .pip-button,
+  .volume-control {
+    display: none !important;
+  }
+  
+  /* Essential mobile controls order: Play | Scrubber | Time | Fullscreen */
+  .play-toggle-button { order: 1; }
+  .scrubber-row { order: 2; flex: 1; }
+  .time-display { order: 3; }
+  .fullscreen-button { order: 4; }
+  
+  /* Make touch targets larger */
+  .play-toggle-button,
+  .fullscreen-button {
+    min-width: 44px;
+    min-height: 44px;
+    padding: 10px;
+  }
+  
+  /* Larger scrubber for mobile */
+  .scrubber {
+    height: 6px;
+  }
+  
+  .scrubber::-webkit-slider-thumb {
+    width: 16px;
+    height: 16px;
+    margin-top: -6px;
+  }
+}
