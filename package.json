@@ -1,6 +1,6 @@
 {
   "name": "@peekabu/peekplayer",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "type": "module",
   "description": "Professional HTML5 video player with HLS support, custom controls, and multi-quality streaming",
   "main": "dist/peekplayer.js",
