@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeekPlayer - Basic Example (UMD)</title>
+    <link rel="stylesheet" href="../dist/peekplayer.css">
+</head>
+<body>
+    <div id="player-wrapper">
+        <video id="peek-video" playsinline webkit-playsinline preload="auto" crossorigin=""></video>
+        <div id="custom-controls"></div>
+        <div id="overlay-container"></div>
+    </div>
+    
+    <!-- Load dependencies -->
+    <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
+    <!-- Load PeekPlayer UMD bundle -->
+    <script src="../dist/peekplayer.js"></script>
+    
+    <script>
+        document.addEventListener('DOMContentLoaded', async () => {
+            const video = document.getElementById('peek-video');
+            const controlsContainer = document.getElementById('custom-controls');
+            const overlayContainer = document.getElementById('overlay-container');
+            
+            // Create PeekPlayer instance (available as global PeekPlayer)
+            const player = new PeekPlayer.PeekPlayer({
+                videoElement: video,
+                controlsContainer: controlsContainer,
+                overlayContainer: overlayContainer
+            });
+            
+            // Load a sample video
+            const sources = [{
+                url: 'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
+                quality: '1080p'
+            }];
+            
+            try {
+                await player.loadSources(sources);
+                console.log('✅ PeekPlayer initialized successfully');
+            } catch (error) {
+                console.error('❌ Failed to initialize PeekPlayer:', error);
+            }
+        });
+    </script>
+</body>
+</html>

@@ -126,7 +126,7 @@ function parseVideoParams() {
         });
     }
     
-    // Multiple quality streams: quality_subsplease+·+720p, quality_yameii+·+1080p+eng, etc.
+    // Multiple quality streams: quality_subs+·+720p, quality_yameii+·+1080p+eng, etc.
     params.forEach((value, key) => {
         if (key.startsWith('quality_')) {
             const qualityString = decodeURIComponent(key.replace('quality_', ''));
