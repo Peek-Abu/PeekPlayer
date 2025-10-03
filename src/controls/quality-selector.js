@@ -7,13 +7,21 @@ export function createQualitySelector(video, player) {
     // Assert required parameters
     assertVideoElement(video, { component: 'QualitySelector', method: 'createQualitySelector' });
     assertExists(player, 'player', { component: 'QualitySelector', method: 'createQualitySelector' });
-    assertExists(player.sourcesData, 'player.sourcesData', { 
-        component: 'QualitySelector', 
-        method: 'createQualitySelector',
-        note: 'Player must have sourcesData property' 
-    });
     
-    const sourcesData = player.sourcesData
+    // Handle case where sourcesData is not yet available (during initialization)
+    const sourcesData = player.sourcesData;
+    if (!sourcesData) {
+        console.log('🎬 Quality selector: sourcesData not available yet, creating placeholder');
+        // Return a hidden placeholder that will be updated later
+        const container = document.createElement('div');
+        container.className = 'quality-selector';
+        container.style.display = 'none'; // Hide until sources are loaded
+        
+        return {
+            element: container,
+            cleanup: () => {}
+        };
+    }
     const container = document.createElement('div');
     container.className = 'quality-selector';
     const button = document.createElement('button');
