@@ -187,6 +187,7 @@ video {
   right: 0;
   width: 100%; /* Ensure it matches wrapper width */
   box-sizing: border-box; /* Include padding in width calculation */
+  z-index: 5; /* Ensure controls are above the vignette */
 }
 
 /* Time Display Component */
@@ -352,19 +353,35 @@ button:focus {
   pointer-events: auto;
 }
 
-.paused-vignette {
+/* Unified Vignette System */
+.controls-vignette {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background: radial-gradient(
-    ellipse at center,
-    rgba(0, 0, 0, 0.1) 0%,
-    rgba(0, 0, 0, 0.3) 50%,
-    rgba(0, 0, 0, 0.6) 100%
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(0, 0, 0, 0.7) 30%,
+    rgba(0, 0, 0, 0.4) 60%,
+    rgba(0, 0, 0, 0) 100%
   );
   pointer-events: none;
+  opacity: 0;
+  transition: opacity 200ms ease;
+  z-index: 2;
+}
+
+/* Stronger vignette when paused */
+.controls-vignette.paused {
+  background: linear-gradient(
+    to top,
+    rgba(0, 0, 0, 0.95) 0%,
+    rgba(0, 0, 0, 0.8) 30%,
+    rgba(0, 0, 0, 0.5) 60%,
+    rgba(0, 0, 0, 0.2) 100%
+  );
 }
 
 .paused-play-button {

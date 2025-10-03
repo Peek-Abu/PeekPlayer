@@ -3,10 +3,6 @@ import { ICONS } from '../constants/icons.js';
 export function createPausedOverlay(video, onPlay) {
     const overlay = document.getElementById('overlay-container');
     
-    // Vignette background
-    const vignette = document.createElement('div');
-    vignette.className = 'paused-vignette';
-    
     // Centered play button
     const playButton = document.createElement('button');
     playButton.className = 'paused-play-button';
@@ -42,7 +38,6 @@ export function createPausedOverlay(video, onPlay) {
     video.addEventListener('loadeddata', updateVisibility);
     
     // Assembly
-    overlay.appendChild(vignette);
     overlay.appendChild(playButton);
     
     // Initial state
@@ -53,7 +48,6 @@ export function createPausedOverlay(video, onPlay) {
         video.removeEventListener('pause', updateVisibility);
         video.removeEventListener('loadeddata', updateVisibility);
         playButton.remove();
-        vignette.remove();
         overlay.remove();
     };
     return { element: overlay, cleanup };
