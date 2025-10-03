@@ -1,0 +1,47 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeekPlayer - HLS Example</title>
+    <link rel="stylesheet" href="../dist/peekplayer.css">
+</head>
+<body>
+    <div id="player-wrapper">
+        <video id="peek-video" playsinline webkit-playsinline preload="auto" crossorigin=""></video>
+        <div id="custom-controls"></div>
+        <div id="overlay-container"></div>
+    </div>
+    
+    <script defer src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
+    <script type="module">
+        import { PeekPlayer } from '../dist/peekplayer.esm.js';
+        
+        document.addEventListener('DOMContentLoaded', async () => {
+            const video = document.getElementById('peek-video');
+            const controlsContainer = document.getElementById('custom-controls');
+            const overlayContainer = document.getElementById('overlay-container');
+            
+            // Create PeekPlayer instance
+            const player = new PeekPlayer({
+                videoElement: video,
+                controlsContainer: controlsContainer,
+                overlayContainer: overlayContainer
+            });
+            
+            // Load HLS stream (will use HLS engine)
+            const sources = [{
+                url: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',
+                quality: 'Auto'
+            }];
+            
+            try {
+                await player.loadSources(sources);
+                console.log('✅ PeekPlayer HLS initialized successfully');
+            } catch (error) {
+                console.error('❌ Failed to initialize PeekPlayer:', error);
+            }
+        });
+    </script>
+</body>
+</html>

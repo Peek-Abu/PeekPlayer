@@ -34,3 +34,15 @@ Thumbs.db
 # Logs
 logs/
 *.log
+
+# Testing
+coverage/
+.nyc_output/
+
+# Temporary files
+*.tmp
+*.temp
+
+# Editor files
+*~
+.#*

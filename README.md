@@ -48,7 +48,19 @@ player.loadSources([
     { url: 'video-720p.m3u8', quality: '720p', provider: 'CDN1' },
     { url: 'video-1080p.m3u8', quality: '1080p', provider: 'CDN2' }
 ]);
+
+// Switch quality programmatically
+player.switchQuality('1080p'); // by quality name
+player.switchQuality(0);       // by index (0 = highest quality)
 ```
+
+## API Methods
+
+- `loadSource(url, headers?)` - Load single video source
+- `loadSources(sources[], headers?)` - Load multiple quality sources  
+- `switchQuality(quality|index)` - Switch between qualities
+- `getSources()` - Get available sources
+- `destroy()` - Clean up player resources
 
 ## 🛠️ Development
 
