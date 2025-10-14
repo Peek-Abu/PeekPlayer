@@ -140,22 +140,22 @@ export function createQualitySelector(video, player) {
         
         // Switch source
         if (player) {
-            const headers = player.headers || {};
+            assertFunction(player.switchQuality, 'player.switchQuality', {
+                component: 'QualitySelector',
+                method: 'selectQuality'
+            });
+
+            console.log('🎬 Using player.switchQuality()');
             
-            // Check if it's HLSWrapper (has switchSource method)
-                console.log('🎬 Using HLSWrapper.switchSource()');
-                
-                // HLSWrapper method
-                player.switchSource(newQuality.url).then(() => {
-                    // Restore playback state
-                    if (wasPlaying) {
-                        video.play();
-                    }
-                    showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
-                }).catch(error => {
-                    console.error('🎬 Quality switch failed:', error);
-                    showNotification('Quality switch failed', 'error');
-                });
+            player.switchQuality(qualityIndex).then(() => {
+                if (wasPlaying) {
+                    video.play();
+                }
+                showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+            }).catch(error => {
+                console.error('🎬 Quality switch failed:', error);
+                showNotification('Quality switch failed', 'error');
+            });
         } else if (video) {
             // Native video element method
             video.src = newQuality.url;
