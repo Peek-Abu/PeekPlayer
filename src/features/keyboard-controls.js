@@ -55,21 +55,25 @@ export function setupKeyboardControls(video, hooks = {}) {
     function togglePlayPause() {
         if (video.paused) {
             video.play();
-            if (hooks.onPlay) hooks.onPlay();
+            if (hooks.onPlaybackChange) hooks.onPlaybackChange(true);
         } else {
             video.pause();
-            if (hooks.onPause) hooks.onPause();
+            if (hooks.onPlaybackChange) hooks.onPlaybackChange(false);
         }
     }
     
     function skipBackward() {
-        video.currentTime = Math.max(0, video.currentTime - TIMING.SKIP_SECONDS);
-        if (hooks.onSeek) hooks.onSeek(video.currentTime);
+        const newTime = Math.max(0, video.currentTime - TIMING.SKIP_SECONDS);
+        const delta = newTime - video.currentTime;
+        video.currentTime = newTime;
+        if (hooks.onSeek) hooks.onSeek(newTime, delta, newTime / video.duration);
     }
     
     function skipForward() {
-        video.currentTime = Math.min(video.duration || 0, video.currentTime + TIMING.SKIP_SECONDS);
-        if (hooks.onSeek) hooks.onSeek(video.currentTime);
+        const newTime = Math.min(video.duration || 0, video.currentTime + TIMING.SKIP_SECONDS);
+        const delta = newTime - video.currentTime;
+        video.currentTime = newTime;
+        if (hooks.onSeek) hooks.onSeek(newTime, delta, newTime / video.duration);
     }
     
     function volumeUp() {
@@ -96,12 +100,10 @@ export function setupKeyboardControls(video, hooks = {}) {
             if (playerWrapper.requestFullscreen) {
                 playerWrapper.requestFullscreen();
             }
-            if (hooks.onFullscreenEnter) hooks.onFullscreenEnter();
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
             }
-            if (hooks.onFullscreenExit) hooks.onFullscreenExit();
         }
     }
     

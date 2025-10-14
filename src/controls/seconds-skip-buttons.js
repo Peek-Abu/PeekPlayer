@@ -3,7 +3,7 @@ import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { TIMING } from '../constants/timing.js';
 
-export function createSecondsSkipButtons(video, onSkip) {
+export function createSecondsSkipButtons(video, onSeek) {
     // Skip backward 10 seconds button
     const skipBackBtn = document.createElement('button');
     skipBackBtn.className = 'skip-button skip-back';
@@ -33,15 +33,17 @@ export function createSecondsSkipButtons(video, onSkip) {
     skipBackBtn.onclick = (e) => {
         e.stopPropagation();
         const newTime = Math.max(0, video.currentTime - TIMING.SKIP_SECONDS);
+        const delta = newTime - video.currentTime
         video.currentTime = newTime;
-        if (onSkip) onSkip(-TIMING.SKIP_SECONDS, newTime);
+        if (onSeek) onSeek(newTime, delta, newTime / video.duration);
     };
     
     skipForwardBtn.onclick = (e) => {
         e.stopPropagation();
         const newTime = Math.min(video.duration || 0, video.currentTime + TIMING.SKIP_SECONDS);
+        const delta = newTime - video.currentTime
         video.currentTime = newTime;
-        if (onSkip) onSkip(TIMING.SKIP_SECONDS, newTime);
+        if (onSeek) onSeek(newTime, delta, newTime / video.duration);
     };
     
     return {

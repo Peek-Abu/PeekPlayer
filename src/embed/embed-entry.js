@@ -239,13 +239,21 @@ async function initializePeekPlayer() {
         const initialUrl = sources[0].url;
         await engine.initialize(initialUrl);
 
-        // Setup controls with hooks
-        const hooks = {
-            onPlay: () => video.play(),
-            onPause: () => video.pause(),
-            onSeek: (time) => video.currentTime = time,
-            onVolumeChange: (volume) => video.volume = volume,
-            onMute: () => video.muted = !video.muted,
+        // Setup controls with separated callbacks/context
+        const callbacks = {
+            onPlaybackChange: (playing) => {
+                playerState.playing = playing;
+                playerState.paused = !playing;
+                sendMessage('playbackChange', playerState);
+            },
+            onSeek: (newTime, delta, pct) => {
+                // video.currentTime = newTime;
+                playerState.currentTime = newTime;
+                playerState.duration = video.duration;
+                playerState.pct = pct;
+                sendMessage('seek', playerState);
+            },
+            onVolumeChange: (volume) => { video.volume = volume; },
             onFullscreen: () => {
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
@@ -253,10 +261,16 @@ async function initializePeekPlayer() {
                     document.getElementById('player-wrapper').requestFullscreen();
                 }
             },
-            player: engine
+            onQualityChange: (qualityLabel) => {
+                playerState.currentQuality = qualityLabel;
+                sendMessage('qualityChange', { ...playerState, quality: qualityLabel });
+            }
         };
 
-        controlsCleanup = setupOverlayControls(video, container, hooks);
+        controlsCleanup = setupOverlayControls(video, container, {
+            callbacks,
+            context: { player: engine }
+        });
 
         // Set up video event listeners for PostMessage API
         setupVideoEventListeners();

@@ -3,7 +3,8 @@ import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { assertVideoElement, assertExists, assertType, assertFunction, assert } from '../utils/assert.js';
 
-export function createQualitySelector(video, player) {
+export function createQualitySelector(video, hooks = {}) {
+    const { player, onQualityChange } = hooks;
     // Assert required parameters
     assertVideoElement(video, { component: 'QualitySelector', method: 'createQualitySelector' });
     assertExists(player, 'player', { component: 'QualitySelector', method: 'createQualitySelector' });
@@ -93,6 +94,12 @@ export function createQualitySelector(video, player) {
     }
     
     // Switch to different quality source
+    const notifyQualityChange = (quality) => {
+        if (!onQualityChange) return;
+        const label = quality.displayName || quality.quality || `${quality.height}p`;
+        onQualityChange(label);
+    };
+
     function selectQuality(qualityIndex) {
         assertType(qualityIndex, 'number', 'qualityIndex', { 
             component: 'QualitySelector', 
@@ -152,6 +159,7 @@ export function createQualitySelector(video, player) {
                     video.play();
                 }
                 showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                notifyQualityChange(newQuality);
             }).catch(error => {
                 console.error('🎬 Quality switch failed:', error);
                 showNotification('Quality switch failed', 'error');
@@ -167,6 +175,7 @@ export function createQualitySelector(video, player) {
                     video.play();
                 }
                 showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                notifyQualityChange(newQuality); // Added this line
             }, { once: true });
         }
         
@@ -306,6 +315,7 @@ export function createQualitySelector(video, player) {
             buildQualityMenu(newSourcesData.sources);
             currentQuality = 0; // Reset to first quality
             updateQualityDisplay();
+            notifyQualityChange(newSourcesData.sources[0]);
         }
     };
     

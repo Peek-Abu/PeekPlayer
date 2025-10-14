@@ -5,12 +5,21 @@ import { setupVideoInteractions } from '../features/video-interactions.js';
 import { setupKeyboardControls } from '../features/keyboard-controls.js';
 import { setupAutoHideControls } from '../features/auto-hide-controls.js';
 import { setupMobileGestures } from '../features/mobile-gestures.js';
-import { assertVideoElement, assertElement, assertExists, assertType } from '../utils/assert.js';
-export function setupOverlayControls(video, container, hooks={}) {
+import { assertVideoElement, assertElement, assertType } from '../utils/assert.js';
+
+export function setupOverlayControls(video, container, options = {}) {
   // Assert required parameters
   assertVideoElement(video, { component: 'Controls', method: 'setupOverlayControls' });
   assertElement(container, 'container', { component: 'Controls', method: 'setupOverlayControls' });
-  assertType(hooks, 'object', 'hooks', { component: 'Controls', method: 'setupOverlayControls' });
+  assertType(options, 'object', 'options', { component: 'Controls', method: 'setupOverlayControls' });
+  const {
+    callbacks = {},
+    controls: controlsConfig = {},
+    context = {}
+  } = options;
+  assertType(callbacks, 'object', 'callbacks', { component: 'Controls', method: 'setupOverlayControls' });
+  assertType(controlsConfig, 'object', 'controlsConfig', { component: 'Controls', method: 'setupOverlayControls' });
+  assertType(context, 'object', 'context', { component: 'Controls', method: 'setupOverlayControls' });
   
   container.innerHTML = '';
   
@@ -23,9 +32,9 @@ export function setupOverlayControls(video, container, hooks={}) {
   });
   
   // Initialize all controls
-  const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, hooks.onSeek);
-  const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, hooks);
-  const { element: pausedOverlay, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, hooks.onPlay);
+  const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek);
+  const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context });
+  const { element: pausedOverlay, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange);
   
   // Assert control components were created successfully
   assertElement(scrubberBar, 'scrubberBar', { component: 'Controls', method: 'setupOverlayControls' });
@@ -37,10 +46,17 @@ export function setupOverlayControls(video, container, hooks={}) {
   container.appendChild(controlRow);
     
   // Setup interactions and behaviors
-  const cleanupInteractions = setupVideoInteractions(video, playerWrapper, hooks);
-  const cleanupKeyboard = setupKeyboardControls(video, hooks);
+  const cleanupInteractions = setupVideoInteractions(video, playerWrapper, callbacks);
+  const cleanupKeyboard = setupKeyboardControls(video, callbacks);
   const cleanupAutoHide = setupAutoHideControls(video, container, playerWrapper);
   const cleanupMobileGestures = setupMobileGestures(video, playerWrapper);
+  const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
+  const handleFullscreenChange = () => {
+    if (callbacks.onFullscreen) {
+      callbacks.onFullscreen(!!document.fullscreenElement);
+    }
+  };
+  fullscreenEvents.forEach((evt) => document.addEventListener(evt, handleFullscreenChange));
   
   // Mobile-specific adjustments
   if ('ontouchstart' in window) {
@@ -56,5 +72,6 @@ export function setupOverlayControls(video, container, hooks={}) {
     scrubberCleanup();
     controlRowCleanup();
     pausedOverlayCleanup();
+    fullscreenEvents.forEach((evt) => document.removeEventListener(evt, handleFullscreenChange));
   };
 }

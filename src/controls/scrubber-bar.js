@@ -55,10 +55,11 @@ export function createScrubberBar(video, onSeek) {
     scrubber.addEventListener('input', () => {
         const pct = scrubber.value / TIMING.SCRUBBER_PRECISION;
         const seekTime = pct * video.duration;
+        const delta = seekTime - video.currentTime;
         // video.currentTime = pct * video.duration;
         // Check buffered ranges
         video.currentTime = seekTime;
-        if (onSeek) onSeek(video.currentTime, pct);
+        if (onSeek) onSeek(video.currentTime, delta, pct);
     });
     
     // Update scrubber position and buffered progress

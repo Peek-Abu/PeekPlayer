@@ -43,6 +43,7 @@ async function fetchSourcesData(params) {
         quality: "Sub · 1080p" 
       }
     ] 
+            
   };
 }
 
@@ -60,10 +61,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   const params = new URLSearchParams(window.location.search);
   
   // Create PeekPlayer instance
+  const logHook = (name, payload) => console.log(`🎛 ${name}:`, payload);
+
   const player = new PeekPlayer({
     videoElement: video,
     controlsContainer: controlsContainer,
-    overlayContainer: overlayContainer
+    overlayContainer: overlayContainer,
+    controls: {
+      skipNext: false,
+    },
+    onPlaybackChange: (playing) => logHook('playbackChange', { playing }),
+    onSeek: (newTime, delta, pct) => {
+      const payload = typeof newTime === 'number'
+        ? { currentTime: newTime, delta, pct }
+        : { time: newTime };
+      logHook('seek', payload);
+    },
+    onVolumeChange: (volume) => logHook('volumeChange', { volume }),
+    onTimeUpdate: (currentTime, duration) => logHook('timeUpdate', { currentTime, duration }),
+    onFullscreen: (isFullscreen) => logHook('fullscreen', { isFullscreen }),
+    onPipChange: (isPipEnabled) => logHook('pipChange', { isPipEnabled }),
+    onQualityChange: (qualityLabel) => logHook('qualityChange', { qualityLabel }),
+    onSkip: (value) => logHook('skip', { value }),
   });
 
   // Load sources from URL parameters or use defaults
