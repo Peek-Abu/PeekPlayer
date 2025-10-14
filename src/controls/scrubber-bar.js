@@ -56,7 +56,6 @@ export function createScrubberBar(video, onSeek) {
         const pct = scrubber.value / TIMING.SCRUBBER_PRECISION;
         const seekTime = pct * video.duration;
         // video.currentTime = pct * video.duration;
-        // Use player engine's seeking if available (for Shaka Player)
         // Check buffered ranges
         video.currentTime = seekTime;
         if (onSeek) onSeek(video.currentTime, pct);
@@ -64,21 +63,22 @@ export function createScrubberBar(video, onSeek) {
     
     // Update scrubber position and buffered progress
     const updateScrubber = () => {
-        if (!video.duration || isUserSeeking) return;
+        if (!video.duration) return;
         
-        // Update current time position with higher precision
-        const currentPercent = (video.currentTime / video.duration) * TIMING.SCRUBBER_PRECISION;
-        scrubber.value = Math.round(currentPercent);
+        // Don't update scrubber value while user is actively seeking, but always update progress bars
+        if (!isUserSeeking) {
+            const currentPercent = (video.currentTime / video.duration) * TIMING.SCRUBBER_PRECISION;
+            scrubber.value = Math.round(currentPercent);
+        }
         
-        // Update current progress CSS custom property for ::after pseudo-element
+        // Always update progress bars (even when seeking or paused)
         const progressPercent = (video.currentTime / video.duration) * 100;
         scrubber.style.setProperty('--progress-width', `${progressPercent}%`);
 
         // Update buffered progress (using CSS custom property)
         updateBufferedProgress();
     };
-    const cleanupTooltip = createScrubberTooltip(scrubber, video);
-
+    
     const updateBufferedProgress = () => {
         if (!video.duration || !video.buffered.length) return;
         
@@ -93,9 +93,11 @@ export function createScrubberBar(video, onSeek) {
                 bufferedEnd = end;
             }
         }
-        const bufferedPercent = Math.min((bufferedEnd / video.duration) * 100, 100); // Fixed: was * 10000
+        const bufferedPercent = Math.min((bufferedEnd / video.duration) * 100, 100);
         scrubber.style.setProperty('--buffered-width', `${bufferedPercent}%`);
     };
+    
+    const cleanupTooltip = createScrubberTooltip(scrubber, video);
     
     // Use requestAnimationFrame for smooth updates
     let animationFrame;
@@ -128,6 +130,10 @@ export function createScrubberBar(video, onSeek) {
     video.addEventListener('seeked', updateScrubber);
 
     const cleanup = () => {
+        if (animationFrame) {
+            cancelAnimationFrame(animationFrame);
+        }
+        cleanupTooltip();
         video.removeEventListener('play', smoothUpdate);
         video.removeEventListener('pause', smoothUpdate);
         video.removeEventListener('progress', updateBufferedProgress);
@@ -136,11 +142,6 @@ export function createScrubberBar(video, onSeek) {
             updateBufferedProgress();
         });
         video.removeEventListener('seeked', updateScrubber);
-        scrubber.removeEventListener('input', () => {
-            const pct = scrubber.value / TIMING.SCRUBBER_PRECISION;
-        });
-        scrubber.remove();
-        bar.remove();
     };
     return { element: bar, cleanup };
 }

@@ -87,6 +87,17 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
         vignette.style.opacity = '1';
     }
     
+    // Initialize vignette state on load
+    function initializeVignette() {
+        if (video.paused) {
+            vignette.classList.add('paused');
+            vignette.style.opacity = '1';
+            controlsElement.style.opacity = '1';
+            controlsElement.style.pointerEvents = 'auto';
+            controlsVisible = true;
+        }
+    }
+    
     // Set initial styles for smooth transitions
     controlsElement.style.transition = `opacity ${TIMING.TRANSITION_DURATION}ms ease, pointer-events ${TIMING.TRANSITION_DURATION}ms ease`;
     controlsElement.style.opacity = '1';
@@ -98,6 +109,9 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
     playerWrapper.addEventListener('mousemove', handleMouseMove);
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
+    
+    // Initialize vignette state
+    initializeVignette();
     
     // Return cleanup function
     return () => {
