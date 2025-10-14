@@ -10,6 +10,10 @@ export function createFullscreenButton(videoWrapper, onFullscreen) {
   function updateFullscreenIcon() {
     btn.innerHTML = ICONS.FULLSCREEN;
   }
+  const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
+  const handleFullscreenChange = () => {
+    updateFullscreenIcon();
+  };
   
   btn.onclick = (e) => {
     e.stopPropagation();
@@ -24,20 +28,17 @@ export function createFullscreenButton(videoWrapper, onFullscreen) {
         console.error('Fullscreen request failed:', err);
       });
     }
-    if (onFullscreen) onFullscreen(!!document.fullscreenElement);
   };
+
   updateFullscreenIcon();
-  document.addEventListener('fullscreenchange', updateFullscreenIcon);
-  document.addEventListener('webkitfullscreenchange', updateFullscreenIcon);
-  document.addEventListener('mozfullscreenchange', updateFullscreenIcon);
+  fullscreenEvents.forEach((evt) => document.addEventListener(evt, handleFullscreenChange));
   const cleanupTooltip = createTooltip(btn, {
     ...TOOLTIP_CONFIG.DYNAMIC_FAST,
     getContent: () => document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen'
   });
   return { element: btn, cleanup: () => {
     cleanupTooltip();
-    document.removeEventListener('fullscreenchange', updateFullscreenIcon);
-    document.removeEventListener('webkitfullscreenchange', updateFullscreenIcon);
-    document.removeEventListener('mozfullscreenchange', updateFullscreenIcon);
+    fullscreenEvents.forEach((evt) => document.removeEventListener(evt, handleFullscreenChange));
   }};
-} 
+}
+ 

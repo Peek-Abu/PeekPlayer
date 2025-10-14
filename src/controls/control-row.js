@@ -7,41 +7,114 @@ import { createSecondsSkipButtons } from './seconds-skip-buttons.js';
 import { createQualitySelector } from './quality-selector.js';
 import { createPipButton } from './pip-button.js';
 
-export function createControlRow(video, hooks = {}) {
+export function createControlRow(video, options = {}) {
     const controlRow = document.createElement('div');
     controlRow.className = 'controls-row';
-    
-    const { element: playBtn, cleanup: playCleanup } = createPlayButton(video, hooks.onPlayPause);
-    const { prevBtn: prevSkipBtn, nextBtn: nextSkipBtn, cleanup: skipCleanup } = createSkipButtons(video, hooks.onSkip);
-    const { element: volumeControl, cleanup: volumeCleanup } = createVolumeControl(video, hooks.onVolumeChange);
-    const { element: timeDisplay, cleanup: timeCleanup } = createTimeDisplay(video, hooks.onTimeUpdate);
-    const { skipBackBtn: secondsSkipBackBtn, skipForwardBtn: secondsSkipForwardBtn, cleanup: secondsSkipCleanup } = createSecondsSkipButtons(video, hooks.onSkip);
-    const { element: pipBtn, cleanup: pipCleanup } = createPipButton(video, hooks.onPipChange);
-    const { element: qualitySelector, cleanup: qualityCleanup } = createQualitySelector(video, hooks.player);
-    const { element: fsBtn, cleanup: fsCleanup } = createFullscreenButton(video.parentElement, hooks.onFullscreen);
-    secondsSkipBackBtn.style.marginLeft = 'auto';
-
-    // Append all sections to main bar
-    controlRow.appendChild(prevSkipBtn);
-    controlRow.appendChild(playBtn);
-    controlRow.appendChild(nextSkipBtn);
-    controlRow.appendChild(volumeControl);
-    controlRow.appendChild(timeDisplay);
-    controlRow.appendChild(secondsSkipBackBtn);
-    controlRow.appendChild(secondsSkipForwardBtn);
-    controlRow.appendChild(qualitySelector);
-    controlRow.appendChild(pipBtn);
-    controlRow.appendChild(fsBtn);
-    
+    const {
+        callbacks = {},
+        controlConfig: incomingConfig = {},
+        context = {}
+    } = options;
+    const defaultConfig = {
+        skipPrevious: true,
+        skipNext: true,
+        playToggle: true,
+        volume: true,
+        timeDisplay: true,
+        secondsSkipBack: true,
+        secondsSkipForward: true,
+        quality: true,
+        pip: true,
+        fullscreen: true
+    };
+    const controlsConfig = { ...defaultConfig, ...incomingConfig };
+    const cleanups = [];
+    let autoMarginApplied = false;
+    const appendElement = (element, applyAutoMargin = false) => {
+        if (!element) return;
+        if (applyAutoMargin && !autoMarginApplied) {
+            element.style.marginLeft = 'auto';
+            autoMarginApplied = true;
+        }
+        controlRow.appendChild(element);
+    };
+    const shouldApplyAutoMargin = () => !autoMarginApplied;
+    let leftClusterAdded = false;
+    let playControl = null;
+    if (controlsConfig.playToggle) {
+        const { element, cleanup } = createPlayButton(video, callbacks.onPlaybackChange);
+        cleanups.push(cleanup);
+        playControl = element;
+    }
+    if (controlsConfig.skipPrevious || controlsConfig.skipNext) {
+        const { prevBtn, nextBtn, cleanup } = createSkipButtons(video, callbacks.onSkip);
+        cleanups.push(cleanup);
+        if (controlsConfig.skipPrevious) {
+            appendElement(prevBtn);
+            leftClusterAdded = true;
+        }
+        if (playControl) {
+            appendElement(playControl);
+            leftClusterAdded = true;
+            playControl = null;
+        }
+        if (controlsConfig.skipNext) {
+            appendElement(nextBtn);
+            leftClusterAdded = true;
+        }
+    }
+    if (playControl) {
+        appendElement(playControl);
+        leftClusterAdded = true;
+        playControl = null;
+    }
+    if (controlsConfig.volume) {
+        const { element, cleanup } = createVolumeControl(video, callbacks.onVolumeChange);
+        cleanups.push(cleanup);
+        appendElement(element);
+        leftClusterAdded = true;
+    }
+    if (controlsConfig.timeDisplay) {
+        const { element, cleanup } = createTimeDisplay(video, callbacks.onTimeUpdate);
+        cleanups.push(cleanup);
+        appendElement(element);
+        leftClusterAdded = true;
+    }
+    const applyAutoMargin = leftClusterAdded;
+    if (controlsConfig.secondsSkipBack || controlsConfig.secondsSkipForward) {
+        const { skipBackBtn, skipForwardBtn, cleanup } = createSecondsSkipButtons(video, callbacks.onSeek);
+        cleanups.push(cleanup);
+        if (controlsConfig.secondsSkipBack) {
+            appendElement(skipBackBtn, applyAutoMargin && shouldApplyAutoMargin());
+        }
+        if (controlsConfig.secondsSkipForward) {
+            appendElement(skipForwardBtn, applyAutoMargin && shouldApplyAutoMargin());
+        }
+    }
+    if (controlsConfig.quality) {
+        const { element, cleanup } = createQualitySelector(video, {
+            player: context.player,
+            onQualityChange: callbacks.onQualityChange
+        });
+        cleanups.push(cleanup);
+        appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
+    }
+    if (controlsConfig.pip) {
+        const { element, cleanup } = createPipButton(video, callbacks.onPipChange);
+        cleanups.push(cleanup);
+        appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
+    }
+    if (controlsConfig.fullscreen) {
+        const { element, cleanup } = createFullscreenButton(video.parentElement, callbacks.onFullscreen);
+        cleanups.push(cleanup);
+        appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
+    }
     const cleanup = () => {
-        playCleanup();
-        skipCleanup();
-        volumeCleanup();
-        timeCleanup();
-        secondsSkipCleanup();
-        pipCleanup();
-        qualityCleanup();
-        fsCleanup();
+        cleanups.forEach((fn) => {
+            if (typeof fn === 'function') {
+                fn();
+            }
+        });
     };
     return { element: controlRow, cleanup };
 }

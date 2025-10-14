@@ -62,6 +62,29 @@ player.switchQuality(0);       // by index (0 = highest quality)
 - `getSources()` - Get available sources
 - `destroy()` - Clean up player resources
 
+## Customizing Controls & Callbacks
+
+When instantiating `PeekPlayer`, you can provide:
+
+```javascript
+const player = new PeekPlayer({
+  videoElement: document.querySelector('video'),
+  controlsContainer: document.getElementById('custom-controls'),
+  overlayContainer: document.getElementById('overlay-container'),
+  controls: {
+    skipPrevious: false,
+    skipNext: false,
+    quality: true
+  },
+  onPlaybackChange: (playing) => console.log('Playback state:', playing),
+  onSeek: (newTime, delta) => console.log('Seeked to:', newTime ?? delta),
+  onVolumeChange: (volume) => console.log('Volume:', volume),
+  onQualityChange: (qualityLabel) => console.log('Quality:', qualityLabel)
+});
+```
+
+Control visibility is handled via the `controls` object, while interactive lifecycle hooks (playback, seeking, fullscreen, etc.) are passed as top-level callback options. Internally, the player forwards these as `{ callbacks, controls, context }` to `setupOverlayControls()` for a clear separation of behavior, configuration, and context.
+
 ## 🛠️ Development
 
 ```bash

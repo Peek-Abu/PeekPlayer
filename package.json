@@ -22,7 +22,7 @@
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "serve": "http-server . -p 3001 -c-1",
+    "serve": "http-server . -p 3001 -a 0.0.0.0",
     "prepare": "npm run build"
   },
   "keywords": [

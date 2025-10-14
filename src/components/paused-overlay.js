@@ -1,6 +1,6 @@
 import { ICONS } from '../constants/icons.js';
 
-export function createPausedOverlay(video, onPlay) {
+export function createPausedOverlay(video, onPlaybackChange) {
     const overlay = document.getElementById('overlay-container');
     
     // Centered play button
@@ -14,7 +14,7 @@ export function createPausedOverlay(video, onPlay) {
     playButton.onclick = (e) => {
         e.stopPropagation();
         video.play();
-        if (onPlay) onPlay();
+        if (onPlaybackChange) onPlaybackChange(true);
     };
     
     // Show/hide based on video state

@@ -43,7 +43,7 @@ async function initializeVideoEngine(video, url, options = {}, sources = []) {
       engine = new VideoJSWrapper(video);
       break;
     case 'hls':
-      engine = new HLSWrapper(video);
+      engine = new HLSWrapper(video, options.hlsConfig);
       break;
     case 'native':
     default:
@@ -147,7 +147,7 @@ function processVideoSources(sourcesData) {
  */
 export class PeekPlayer {
   constructor(options = {}) {
-    const { videoElement, controlsContainer, overlayContainer, engine } = options;
+    const { videoElement, controlsContainer, overlayContainer, engine, hlsConfig } = options;
     
     // Validate required elements
     assertVideoElement(videoElement, { component: 'PeekPlayer', method: 'constructor' });
@@ -159,7 +159,8 @@ export class PeekPlayer {
     this.engine = null;
     this.sourcesData = null;
     this.controlsInitialized = false;
-    this.options = { engine, ...options };
+    this.options = { engine, hlsConfig, ...options };
+    this.options.controls = { ...(options.controls || {}) };
     
     // Set up video event listeners
     this._setupVideoListeners();
@@ -176,9 +177,31 @@ export class PeekPlayer {
     if (this.controlsInitialized) return;
     this.controlsInitialized = true;
     
+    const callbackKeys = [
+      'onPlaybackChange',
+      'onSeek',
+      'onVolumeChange',
+      'onFullscreen',
+      'onTimeUpdate',
+      'onSkip',
+      'onPipChange',
+      'onQualityChange'
+    ];
+
+    const callbacks = callbackKeys.reduce((acc, key) => {
+      if (typeof this.options[key] === 'function') {
+        acc[key] = this.options[key];
+      }
+      return acc;
+    }, {});
+
     setupOverlayControls(this.video, this.controlsContainer, {
-      player: this, // Pass the PeekPlayer instance, not just the engine
-      overlayContainer: this.overlayContainer
+      callbacks,
+      controls: this.options.controls || {},
+      context: {
+        player: this,
+        overlayContainer: this.overlayContainer
+      }
     });
   }
 

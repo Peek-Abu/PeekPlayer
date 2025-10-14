@@ -1,13 +1,14 @@
 // Native HLS Engine Wrapper
 export class HLSWrapper {
-  constructor(videoElement) {
+  constructor(videoElement, hlsConfig = {}) {
     this.video = videoElement;
     this.hls = null;
     this.sourcesData = null;
+    this.hlsConfig = hlsConfig;
   }
 
   async initialize(hlsUrl) {
-    console.log('🎬 Initializing HLS Engine');
+    console.log('🎬 Initializing HLS Engine', hlsUrl);
 
     // Check if browser supports HLS natively (Safari/iOS)
     if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
@@ -18,8 +19,7 @@ export class HLSWrapper {
 
     // Use HLS.js for other browsers
     if (window.Hls && Hls.isSupported()) {
-      console.log('Using HLS.js');
-      this.hls = new Hls({
+      const defaultConfig = {
         enableWorker: true,
         lowLatencyMode: false,
         // Encryption and codec handling
@@ -38,6 +38,10 @@ export class HLSWrapper {
         debug: false,
         // Handle encrypted streams better
         emeEnabled: true,
+      }
+      this.hls = new Hls({
+        ...defaultConfig,
+        ...this.hlsConfig
       });
 
       this.hls.loadSource(hlsUrl);
