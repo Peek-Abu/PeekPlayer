@@ -76,11 +76,11 @@ video {
   left: 0;
   height: 100%;
   width: var(--buffered-width);
-  background: rgba(255, 255, 255, 1); /* Medium opacity for buffered */
+  background: rgba(255, 255, 255, 0.2);
   border-radius: inherit;
   pointer-events: none;
   transition: width 0.3s ease;
-  z-index: 2;
+  z-index: -1; /* Behind the slider thumb */
 }
 
 /* Layer 2: Current progress (played content) */
@@ -91,11 +91,11 @@ video {
   left: 0;
   height: 100%;
   width: var(--progress-width);
-  background: rgba(255, 255, 255, 0.2); /* Medium opacity for buffered */
+  background: rgba(255, 255, 255, 1);
   border-radius: inherit;
   pointer-events: none;
   transition: width 0.1s ease;
-  z-index: 1;
+  z-index: -1; /* Behind the slider thumb */
 }
 
 /* Remove default webkit progress styling */
