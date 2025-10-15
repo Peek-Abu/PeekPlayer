@@ -1,7 +1,7 @@
 import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
-export function createFullscreenButton(videoWrapper, onFullscreen) {
+export function createFullscreenButton(videoWrapper, onFullscreen, logger) {
   const btn = document.createElement('button');
   btn.className = 'fullscreen-button';
   btn.style.pointerEvents = 'auto';
@@ -25,7 +25,7 @@ export function createFullscreenButton(videoWrapper, onFullscreen) {
         videoWrapper.style.width = '100%';
         videoWrapper.style.height = '100%';
       }).catch((err) => {
-        console.error('Fullscreen request failed:', err);
+        logger.error('Fullscreen request failed:', err);
       });
     }
   };

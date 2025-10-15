@@ -12,8 +12,10 @@ export function setupOverlayControls(video, container, options = {}) {
   assertVideoElement(video, { component: 'Controls', method: 'setupOverlayControls' });
   assertElement(container, 'container', { component: 'Controls', method: 'setupOverlayControls' });
   assertType(options, 'object', 'options', { component: 'Controls', method: 'setupOverlayControls' });
+  assertType(options.logger, 'object', 'options.logger', { component: 'Controls', method: 'setupOverlayControls' });
   const {
     callbacks = {},
+    logger,
     controls: controlsConfig = {},
     context = {}
   } = options;
@@ -33,7 +35,7 @@ export function setupOverlayControls(video, container, options = {}) {
   
   // Initialize all controls
   const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek);
-  const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context });
+  const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context, logger });
   const { element: pausedOverlay, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange);
   
   // Assert control components were created successfully
@@ -68,7 +70,7 @@ export function setupOverlayControls(video, container, options = {}) {
     cleanupInteractions();
     cleanupKeyboard();
     cleanupAutoHide();
-    cleanupMobileGestures();
+    if (cleanupMobileGestures) cleanupMobileGestures();
     scrubberCleanup();
     controlRowCleanup();
     pausedOverlayCleanup();

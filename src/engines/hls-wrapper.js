@@ -1,18 +1,19 @@
 // Native HLS Engine Wrapper
 export class HLSWrapper {
-  constructor(videoElement, hlsConfig = {}) {
+  constructor(videoElement, hlsConfig = {}, logger) {
     this.video = videoElement;
     this.hls = null;
     this.sourcesData = null;
     this.hlsConfig = hlsConfig;
+    this.logger = logger;
   }
 
   async initialize(hlsUrl) {
-    console.log('🎬 Initializing HLS Engine', hlsUrl);
+    this.logger.log('🎬 Initializing HLS Engine', hlsUrl);
 
     // Check if browser supports HLS natively (Safari/iOS)
     if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
-      console.log('🎬 Using native HLS support');
+      this.logger.log('🎬 Using native HLS support');
       this.video.src = hlsUrl;
       return this;
     }
@@ -49,18 +50,18 @@ export class HLSWrapper {
 
       // Event listeners
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('🎬 HLS manifest parsed');
+        this.logger.log('🎬 HLS manifest parsed');
       });
 
       this.hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error('🎬 HLS Error:', data);
+        this.logger.error('🎬 HLS Error:', data);
       });
 
       return this;
     }
 
     // Fallback to direct URL
-    console.log('🎬 Using direct URL fallback');
+    this.logger.log('🎬 Using direct URL fallback');
     this.video.src = hlsUrl;
     return this;
   }

@@ -33,7 +33,7 @@ async function fetchSourcesData(params) {
   } catch (error) {
       console.error('🎬 API fetch failed:', error);
   }
-  
+
   // Default fallback source
   return { 
     headers: {}, 
@@ -42,8 +42,7 @@ async function fetchSourcesData(params) {
         url: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',
         quality: "Sub · 1080p" 
       }
-    ] 
-            
+    ]   
   };
 }
 
@@ -67,6 +66,11 @@ document.addEventListener("DOMContentLoaded", async () => {
     videoElement: video,
     controlsContainer: controlsContainer,
     overlayContainer: overlayContainer,
+    autoplay: true,
+    autoNext: true,
+    autoUnmuteOnInteraction: true,
+    poster: 'https://dummyimage.com/1920x1080/000/fff&text=PeekPlayer',
+    debug: false,
     controls: {
       skipNext: false,
     },

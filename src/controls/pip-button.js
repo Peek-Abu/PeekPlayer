@@ -2,7 +2,7 @@ import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 
-export function createPipButton(video, onPipChange) {
+export function createPipButton(video, onPipChange, logger) {
     const button = document.createElement('button');
     button.className = 'pip-button';
     button.style.pointerEvents = 'auto';
@@ -41,7 +41,7 @@ export function createPipButton(video, onPipChange) {
                 await video.requestPictureInPicture();
             }
         } catch (error) {
-            console.warn('PiP operation failed:', error);
+            logger.warn('PiP operation failed:', error);
             // Could show a toast notification here
         }
     }

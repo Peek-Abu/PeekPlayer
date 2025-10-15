@@ -114,7 +114,7 @@ export function createVolumeControl(video, onVolumeChange) {
     container.appendChild(muteBtn);
     container.appendChild(volumeSlider);
     return { element: container, cleanup: () => {
-        container.cleanup();
+        container.remove();
         muteTooltip();
         volumeTooltip();
     }};
