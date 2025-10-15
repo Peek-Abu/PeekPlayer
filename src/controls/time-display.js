@@ -57,9 +57,9 @@ export function createTimeDisplay(video, onTimeUpdate) {
     updateTimeDisplay();
 
     return { element: timeContainer, cleanup: () => {
-        cleanupTooltip();
         video.removeEventListener('timeupdate', updateTimeDisplay);
         video.removeEventListener('loadedmetadata', updateTimeDisplay);
         video.removeEventListener('durationchange', updateTimeDisplay);
+        timeContainer.remove();
     }};
 }

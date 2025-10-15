@@ -4,8 +4,28 @@ import { HLSWrapper } from '../engines/hls-wrapper.js';
 import { VideoJSWrapper } from '../engines/videojs-wrapper.js';
 import { assert, assertExists, assertVideoElement, assertType } from '../utils/assert.js';
 
+const DEFAULT_LOGGER = {
+  debugEnabled: false,
+  setDebug(enabled) {
+    this.debugEnabled = enabled;
+  },
+  log(...args) {
+    if (this.debugEnabled) {
+      console.log(...args);
+    }
+  },
+  warn(...args) {
+    if (this.debugEnabled) {
+      console.warn(...args);
+    }
+  },
+  error(...args) {
+    console.error(...args);
+  }
+};
+
 // Engine selection logic
-function selectVideoEngine(options = {}, sources = []) {
+function selectVideoEngine(options = {}, sources = [], logger = DEFAULT_LOGGER) {
   if (options.engine) return options.engine;
   
   const forceHLS = new URLSearchParams(window.location.search).get('engine') === 'hls';
@@ -29,13 +49,13 @@ function selectVideoEngine(options = {}, sources = []) {
   return 'native';
 }
 
-async function initializeVideoEngine(video, url, options = {}, sources = []) {
+async function initializeVideoEngine(video, url, options = {}, sources = [], logger = DEFAULT_LOGGER) {
   assertVideoElement(video, { component: 'Player', method: 'initializeVideoEngine' });
   assertExists(url, 'url', { component: 'Player', method: 'initializeVideoEngine' });
   assertType(url, 'string', 'url', { component: 'Player', method: 'initializeVideoEngine' });
   
-  const engineType = selectVideoEngine(options, sources);
-  console.log(`🎬 Selected engine: ${engineType}`);
+  const engineType = selectVideoEngine(options, sources, logger);
+  logger.log(`🎬 Selected engine: ${engineType}`);
   
   let engine;
   switch (engineType) {
@@ -43,7 +63,7 @@ async function initializeVideoEngine(video, url, options = {}, sources = []) {
       engine = new VideoJSWrapper(video);
       break;
     case 'hls':
-      engine = new HLSWrapper(video, options.hlsConfig);
+      engine = new HLSWrapper(video, options.hlsConfig, logger);
       break;
     case 'native':
     default:
@@ -73,52 +93,6 @@ async function initializeVideoEngine(video, url, options = {}, sources = []) {
   return engine;
 }
 
-async function fetchSourcesData(params) {
-  assertExists(params, 'params', { component: 'Player', method: 'fetchSourcesData' });
-  assert(
-    params instanceof URLSearchParams,
-    'params must be URLSearchParams instance',
-    { component: 'Player', method: 'fetchSourcesData', params }
-  );
-  
-  try {
-      // Method 1: Direct sources JSON (BEST for flexibility)
-    const sourcesParam = params.get('sources');
-    if (sourcesParam) {
-        try {
-            const sourcesData = JSON.parse(decodeURIComponent(sourcesParam));
-            assert(
-              Array.isArray(sourcesData),
-              'Sources data must be an array',
-              { component: 'Player', method: 'fetchSourcesData', sourcesData }
-            );
-            console.log('🎬 Loaded sources from URL:', sourcesData);
-            return { headers: {}, sources: sourcesData };
-        } catch (error) {
-            console.error('🎬 Sources parse failed:', error);
-        }
-    }
-    
-    // Method 2: Generic API URL (any API that returns your format)
-    const apiUrl = params.get('api');
-    if (apiUrl) {
-        try {
-            console.log('🎬 Fetching from API:', apiUrl);
-            const response = await fetch(apiUrl);
-            const data = await response.json();
-            console.log('🎬 API Response:', data);
-            return data;
-        } catch (error) {
-            console.error('🎬 API fetch failed:', error);
-        }
-    }
-  } catch (error) {
-      console.error('🎬 API fetch failed:', error);
-  }
-  return { headers: {}, sources: [
-    { url: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',"quality":"SubsPlease · 360p" }
-  ] };
-}
 
 function processVideoSources(sourcesData) {
   if (!sourcesData?.sources?.length) return null;
@@ -147,7 +121,19 @@ function processVideoSources(sourcesData) {
  */
 export class PeekPlayer {
   constructor(options = {}) {
-    const { videoElement, controlsContainer, overlayContainer, engine, hlsConfig } = options;
+    const {
+      videoElement,
+      controlsContainer,
+      overlayContainer,
+      engine,
+      hlsConfig,
+      autoplay = false,
+      autoNext = false,
+      poster,
+      debug = false,
+      autoUnmuteOnInteraction = false,
+      logger
+    } = options;
     
     // Validate required elements
     assertVideoElement(videoElement, { component: 'PeekPlayer', method: 'constructor' });
@@ -159,21 +145,106 @@ export class PeekPlayer {
     this.engine = null;
     this.sourcesData = null;
     this.controlsInitialized = false;
-    this.options = { engine, hlsConfig, ...options };
+    this.controlsCleanup = null;
+    this.options = {
+      ...options,
+      engine,
+      hlsConfig,
+      autoplay,
+      autoNext,
+      poster,
+      debug,
+      logger: logger || DEFAULT_LOGGER,
+      autoUnmuteOnInteraction
+    };
+    this.logger = this.options.logger;
+    if (this.logger && typeof this.logger.setDebug === 'function') {
+      this.logger.setDebug(!!debug);
+    } else if (this.logger) {
+      this.logger.debugEnabled = !!debug;
+    }
+    this.autoplay = !!autoplay;
+    this.autoNext = !!autoNext;
     this.options.controls = { ...(options.controls || {}) };
+    this.logger.log('🎬 PeekPlayer initialized with options:', {
+      autoplay: this.autoplay,
+      autoNext: this.autoNext,
+      poster: !!poster,
+      debug: !!debug,
+      autoUnmuteOnInteraction: !!autoUnmuteOnInteraction
+    });
+    if (poster) {
+      this.video.poster = poster;
+    }
+    if (this.autoplay) {
+      this.video.setAttribute('autoplay', '');
+      this.video.muted = true;
+      this.video.setAttribute('muted', '');
+      this.video.setAttribute('playsinline', '');
+    }
+    this.autoUnmuteOnInteraction = !!autoUnmuteOnInteraction;
+    this._handleVideoEnd = this._handleVideoEnd.bind(this);
     
     // Set up video event listeners
     this._setupVideoListeners();
+    this._setupAutoUnmute();
   }
 
   _setupVideoListeners() {
     this.video.addEventListener('loadedmetadata', () => this._initControls());
     this.video.addEventListener('error', (e) => {
-      console.error('🎬 Video error:', this.video.error);
+      this.logger.error('🎬 Video error:', this.video.error);
     });
+    this.video.addEventListener('ended', this._handleVideoEnd);
   }
 
-  _initControls() {
+  _setupAutoUnmute() {
+    if (!(this.autoplay && this.autoUnmuteOnInteraction)) {
+      return;
+    }
+
+    const handler = () => {
+      if (!this.video.muted) {
+        cleanup();
+        return;
+      }
+
+      this.logger.log('🎬 Auto-unmute triggered by user interaction');
+      this.video.muted = false;
+      this.video.removeAttribute('muted');
+      cleanup();
+    };
+
+    const cleanup = () => {
+      this.video.removeEventListener('click', handler);
+      this.controlsContainer?.removeEventListener('click', handler);
+      document.removeEventListener('keydown', handler);
+      this._autoUnmuteCleanup = null;
+    };
+
+    this.video.addEventListener('click', handler, { once: false });
+    this.controlsContainer?.addEventListener('click', handler, { once: false });
+    document.addEventListener('keydown', handler, { once: false });
+
+    this._autoUnmuteCleanup = cleanup;
+  }
+
+  _handleVideoEnd() {
+    if (this.autoNext && typeof this.options.onSkip === 'function') {
+      this.logger.log('🎬 AutoNext triggered on ended');
+      this.options.onSkip('next');
+    }
+  }
+
+  _initControls(force = false) {
+    if (this.controlsInitialized && !force) return;
+
+    if (force && this.controlsCleanup) {
+      this.controlsCleanup();
+      this.controlsCleanup = null;
+      this.controlsInitialized = false;
+    }
+
     if (this.controlsInitialized) return;
     this.controlsInitialized = true;
     
@@ -195,7 +266,8 @@ export class PeekPlayer {
       return acc;
     }, {});
 
-    setupOverlayControls(this.video, this.controlsContainer, {
+    this.controlsCleanup = setupOverlayControls(this.video, this.controlsContainer, {
+      logger: this.logger,
       callbacks,
       controls: this.options.controls || {},
       context: {
@@ -205,6 +277,92 @@ export class PeekPlayer {
     });
   }
 
+  _teardownControls() {
+    if (this.controlsCleanup) {
+      this.controlsCleanup();
+      this.controlsCleanup = null;
+    }
+    this.controlsInitialized = false;
+  }
+
+  refreshControls() {
+    if (this.controlsInitialized) {
+      this._initControls(true);
+    }
+  }
+
+  updateOptions(partialOptions = {}) {
+    assertType(partialOptions, 'object', 'partialOptions', { component: 'PeekPlayer', method: 'updateOptions' });
+
+    const {
+      autoplay,
+      autoNext,
+      autoUnmuteOnInteraction,
+      controls: controlsUpdate,
+      logger,
+      ...otherOptions
+    } = partialOptions;
+
+    Object.assign(this.options, otherOptions);
+
+    if (logger && logger !== this.logger) {
+      this.logger = logger;
+    }
+
+    if (typeof autoplay !== 'undefined') {
+      const value = !!autoplay;
+      this.autoplay = value;
+      this.options.autoplay = value;
+
+      if (value) {
+        this.video.setAttribute('autoplay', '');
+        if (!this.video.hasAttribute('muted')) {
+          this.video.muted = true;
+          this.video.setAttribute('muted', '');
+        }
+
+        if (this.video.readyState >= 2) {
+          this.video.play().catch((error) => {
+            this.logger?.warn?.('🎬 Autoplay play() failed after enabling:', error);
+          });
+        }
+      } else {
+        this.video.removeAttribute('autoplay');
+        if (!this.video.paused) {
+          this.video.pause();
+        }
+      }
+    }
+
+    if (typeof autoNext !== 'undefined') {
+      const value = !!autoNext;
+      this.autoNext = value;
+      this.options.autoNext = value;
+    }
+
+    if (typeof autoUnmuteOnInteraction !== 'undefined') {
+      const value = !!autoUnmuteOnInteraction;
+      this.autoUnmuteOnInteraction = value;
+      this.options.autoUnmuteOnInteraction = value;
+
+      if (typeof this._autoUnmuteCleanup === 'function') {
+        this._autoUnmuteCleanup();
+        this._autoUnmuteCleanup = null;
+      }
+
+      this._setupAutoUnmute();
+    }
+
+    if (typeof controlsUpdate !== 'undefined') {
+      assertType(controlsUpdate, 'object', 'controlsUpdate', { component: 'PeekPlayer', method: 'updateOptions' });
+      this.options.controls = {
+        ...(this.options.controls || {}),
+        ...controlsUpdate
+      };
+      this.refreshControls();
+    }
+  }
+
   async loadSource(url, headers = {}) {
     assertExists(url, 'url', { component: 'PeekPlayer', method: 'loadSource' });
     assertType(url, 'string', 'url', { component: 'PeekPlayer', method: 'loadSource' });
@@ -212,20 +370,27 @@ export class PeekPlayer {
     try {
       // Pass current sources for engine selection
       const sources = this.sourcesData?.sources || [];
-      this.engine = await initializeVideoEngine(this.video, url, this.options, sources);
+      this.engine = await initializeVideoEngine(this.video, url, this.options, sources, this.logger);
       this.video._engine = this.engine;
+      
+      // Ensure video attributes and playback respect autoplay preference
+      if (this.autoplay) {
+        this.video.play();
+      } else {
+        this.video.pause();
+      }
       
       // Force controls initialization after a delay if metadata doesn't load
       setTimeout(() => {
         if (!this.controlsInitialized) {
-          console.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
+          this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
           this._initControls();
         }
       }, 2000);
       
       return this;
     } catch (error) {
-      console.error('🎬 Failed to load source:', error);
+      this.logger.error('🎬 Failed to load source:', error);
       throw error;
     }
   }
@@ -248,13 +413,19 @@ export class PeekPlayer {
     const initialSource = processedSources.sources[0];
     
     // Initialize engine with sources for proper engine selection
-    this.engine = await initializeVideoEngine(this.video, initialSource.url, this.options, processedSources.sources);
+    this.engine = await initializeVideoEngine(this.video, initialSource.url, this.options, processedSources.sources, this.logger);
     this.video._engine = this.engine;
+    // Ensure video attributes and playback respect autoplay preference
+    if (this.autoplay) {
+      this.video.play();
+    } else {
+      this.video.pause();
+    }
     
     // Force controls initialization after a delay if metadata doesn't load
     setTimeout(() => {
       if (!this.controlsInitialized) {
-        console.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
+        this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
         this._initControls();
       }
     }, 2000);
@@ -303,7 +474,10 @@ export class PeekPlayer {
       this.engine = null;
     }
     this.sourcesData = null;
-    this.controlsInitialized = false;
+    this._teardownControls();
+    if (typeof this._autoUnmuteCleanup === 'function') {
+      this._autoUnmuteCleanup();
+    }
   }
 }
 

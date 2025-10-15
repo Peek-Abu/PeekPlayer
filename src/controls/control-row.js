@@ -13,7 +13,8 @@ export function createControlRow(video, options = {}) {
     const {
         callbacks = {},
         controlConfig: incomingConfig = {},
-        context = {}
+        context = {},
+        logger
     } = options;
     const defaultConfig = {
         skipPrevious: true,
@@ -95,17 +96,17 @@ export function createControlRow(video, options = {}) {
         const { element, cleanup } = createQualitySelector(video, {
             player: context.player,
             onQualityChange: callbacks.onQualityChange
-        });
+        }, logger);
         cleanups.push(cleanup);
         appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
     }
     if (controlsConfig.pip) {
-        const { element, cleanup } = createPipButton(video, callbacks.onPipChange);
+        const { element, cleanup } = createPipButton(video, callbacks.onPipChange, logger);
         cleanups.push(cleanup);
         appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
     }
     if (controlsConfig.fullscreen) {
-        const { element, cleanup } = createFullscreenButton(video.parentElement, callbacks.onFullscreen);
+        const { element, cleanup } = createFullscreenButton(video.parentElement, callbacks.onFullscreen, logger);
         cleanups.push(cleanup);
         appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
     }
