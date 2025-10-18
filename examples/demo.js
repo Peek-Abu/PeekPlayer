@@ -61,18 +61,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   
   // Create PeekPlayer instance
   const logHook = (name, payload) => console.log(`🎛 ${name}:`, payload);
-
+  
   const player = new PeekPlayer({
     videoElement: video,
     controlsContainer: controlsContainer,
     overlayContainer: overlayContainer,
-    autoplay: true,
+    // autoplay: true,
     autoNext: true,
-    autoUnmuteOnInteraction: true,
+    // autoUnmuteOnInteraction: true,
     poster: 'https://dummyimage.com/1920x1080/000/fff&text=PeekPlayer',
     debug: false,
     controls: {
       skipNext: false,
+    },
+    segments: [
+      { start: 0, end: 95, label: 'Intro'  },
+      // { start: 30, end: 120, label: 'Episode' },
+      { start: 500, end: 600, label: 'Outro' }
+    ],
+    segmentAutoSkip: {
+      labels: ['Intro'],
+      tolerance: 0.25,
+      offsetAfter: 1.5,
     },
     onPlaybackChange: (playing) => logHook('playbackChange', { playing }),
     onSeek: (newTime, delta, pct) => {

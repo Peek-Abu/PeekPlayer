@@ -32,147 +32,111 @@ video {
   padding: 4px 0; /* Add padding for easier hover target */
 }
 
+
 .scrubber {
   flex: 1;
-  appearance: none;
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255,255,255,0.22);
-  outline: none;
-  cursor: pointer;
-  transition: all 0.2s ease;
   position: relative;
-  
-  /* Custom properties for buffered progress */
-  --buffered-width: 0%;
-  --progress-width: 0%;
+  display: flex;
+  align-items: center;
+  height: 20px;
+  cursor: pointer;
 }
 
-/* Hover effect - make track taller and more visible */
-.scrubber:hover,
-.scrubber.scrubber--hover {
-  /* height: 6px; */
-  background: rgba(255,255,255,0.3);
-}
-
-/* Buffered progress background */
-/* .scrubber::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: 0;
+.segmented-scrubber {
+  position: relative;
+  width: 100%;
   height: 100%;
-  width: var(--buffered-width);
-  background: rgba(255,255,255,1);
-  border-radius: inherit;
+  display: flex;
+  align-items: center;
+}
+
+.segmented-scrubber__track {
+  position: relative;
+  width: 100%;
+  height: 5px;
+  border-radius: 3px;
+  overflow: visible;
+}
+
+.segmented-scrubber__segments {
+  position: absolute;
+  inset: 0;
   pointer-events: none;
-  transition: all 0.2s ease;
-} */
+}
 
-/* Layer 1: Buffered progress (loaded content) */
-.scrubber::before {
-  content: '';
+.segmented-scrubber__segment {
   position: absolute;
   top: 0;
+  bottom: 0;
+  left: var(--segment-left, 0);
+  width: var(--segment-width, 0);
+  pointer-events: none;
+  z-index: 0;
+  box-sizing: border-box;
+}
+
+.segmented-scrubber__segment-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.2s ease;
+}
+
+.segmented-scrubber__segment-buffered {
+  position: absolute;
+  top: 0;
+  bottom: 0;
   left: 0;
-  height: 100%;
-  width: var(--buffered-width);
+  width: 0;
+  border-radius: 3px;
   background: rgba(255, 255, 255, 0.2);
-  border-radius: inherit;
-  pointer-events: none;
-  transition: width 0.3s ease;
-  z-index: -1; /* Behind the slider thumb */
+  transition: width 0.15s ease;
 }
 
-/* Layer 2: Current progress (played content) */
-.scrubber::after {
-  content: '';
+.segmented-scrubber__segment-played {
   position: absolute;
   top: 0;
+  bottom: 0;
   left: 0;
-  height: 100%;
-  width: var(--progress-width);
-  background: rgba(255, 255, 255, 1);
-  border-radius: inherit;
-  pointer-events: none;
+  width: 0;
+  border-radius: 3px;
+  background: rgba(255, 255, 255, 0.9);
   transition: width 0.1s ease;
-  z-index: -1; /* Behind the slider thumb */
 }
 
-/* Remove default webkit progress styling */
-.scrubber::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: transparent; /* Make transparent so our custom layers show */
-}
-
-.scrubber:hover::-webkit-slider-runnable-track {
-  background: transparent;
-}
-
-/* Progress fill (current time) */
-.scrubber::-webkit-slider-thumb {
-  appearance: none;
-  width: 12px;
-  height: 12px;
+.segmented-scrubber__thumb {
+  position: absolute;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 14px;
+  height: 14px;
   border-radius: 50%;
   background: #fff;
-  cursor: pointer;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.3);
   opacity: 0;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-  margin-top: -4px;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-/* Show thumb on hover */
-.scrubber:hover::-webkit-slider-thumb,
-.scrubber.scrubber--hover::-webkit-slider-thumb {
+.segmented-scrubber__segment--hover .segmented-scrubber__segment-track, 
+.segmented-scrubber__segment--hover .segmented-scrubber__segment-played,
+.segmented-scrubber__segment--hover .segmented-scrubber__segment-buffered {
+  transform: scaleY(2);
+  transform-origin: center;
+}
+
+.segmented-scrubber:focus,
+.segmented-scrubber:focus-visible,
+.segmented-scrubber__thumb:focus {
+  outline: none;
+  box-shadow: none;
+}
+.scrubber.scrubber--hover .segmented-scrubber__thumb,
+.segmented-scrubber--scrubbing .segmented-scrubber__thumb,
+.segmented-scrubber:focus-visible .segmented-scrubber__thumb {
   opacity: 1;
-  transform: scale(1.1);
-}
-
-/* Firefox thumb styling */
-.scrubber::-moz-range-thumb {
-  width: 12px;
-  height: 12px;
-  border-radius: 50%;
-  background: #fff;
-  cursor: pointer;
-  border: none;
-  opacity: 0;
-  transition: all 0.2s ease;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
-}
-
-.scrubber:hover::-moz-range-thumb,
-.scrubber.scrubber--hover::-moz-range-thumb {
-  opacity: 1;
-  transform: scale(1.1);
-}
-
-/* Firefox track styling */
-.scrubber::-moz-range-track {
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255,255,255,0.22);
-  border: none;
-}
-
-.scrubber:hover::-moz-range-track {
-  height: 6px;
-  background: rgba(255,255,255,0.3);
-}
-
-/* Progress fill for webkit browsers */
-.scrubber::-webkit-slider-runnable-track {
-  height: 4px;
-  border-radius: 2px;
-  background: rgba(255,255,255,0.22);
-}
-
-.scrubber:hover::-webkit-slider-runnable-track {
-  height: 6px;
-  background: rgba(255,255,255,0.3);
+  transform: translate(-50%, -50%) scale(1.1);
 }
 
 .controls-row {
@@ -186,9 +150,9 @@ video {
   bottom: 0;
   left: 0;
   right: 0;
-  width: 100%; /* Ensure it matches wrapper width */
-  box-sizing: border-box; /* Include padding in width calculation */
-  z-index: 5; /* Ensure controls are above the vignette */
+  width: 100%;
+  box-sizing: border-box;
+  z-index: 5;
 }
 
 /* Time Display Component */
@@ -520,10 +484,10 @@ button:focus {
 /* Enhanced tooltip for scrubber with thumbnails */
 .tooltip--scrubber {
   padding: 0;
-  background: rgba(0, 0, 0, 0.9);
-  border-radius: 6px;
+  background: rgba(1, 1, 1, 0);
   overflow: hidden;
   min-width: 160px;
+  box-shadow: 0px 0px 0px rgba(0, 0, 0, 0);
 }
 
 .tooltip__thumbnail {
@@ -542,15 +506,20 @@ button:focus {
   font-weight: 500;
   color: #fff;
   text-align: center;
-  background: rgba(0, 0, 0, 0.9);
-  border-radius: 0 0 4px 4px;
+  background: rgba(0, 0, 0, 0);
 }
-
+.tooltip__segment-label {
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  color: #fff;
+  text-align: center;
+  background: rgba(0, 0, 0, 0);
+}
 /* Larger arrow for scrubber tooltip */
 .tooltip--scrubber::before {
-  border-width: 6px;
   bottom: -12px;
-  border-top-color: rgba(0, 0, 0, 0.9);
+  border-top-color: rgba(1, 1, 1, 0);
 }
 
 /* Quality Selector Component */

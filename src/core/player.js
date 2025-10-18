@@ -24,6 +24,33 @@ const DEFAULT_LOGGER = {
   }
 };
 
+function normalizeSegments(segments = []) {
+  if (!Array.isArray(segments)) {
+    return [];
+  }
+
+  return segments
+    .map((segment) => {
+      if (!segment || typeof segment !== 'object') return null;
+
+      const start = Number(segment.start);
+      const end = Number(segment.end);
+      if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) {
+        return null;
+      }
+
+      return {
+        label: segment.label ?? '',
+        start: Math.max(0, start),
+        end: Math.max(0, end),
+        color: segment.color,
+        data: segment.data
+      };
+    })
+    .filter(Boolean)
+    .sort((a, b) => a.start - b.start);
+}
+
 // Engine selection logic
 function selectVideoEngine(options = {}, sources = [], logger = DEFAULT_LOGGER) {
   if (options.engine) return options.engine;
@@ -93,7 +120,6 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
   return engine;
 }
 
-
 function processVideoSources(sourcesData) {
   if (!sourcesData?.sources?.length) return null;
   
@@ -132,6 +158,7 @@ export class PeekPlayer {
       poster,
       debug = false,
       autoUnmuteOnInteraction = false,
+      segments = [],
       logger
     } = options;
     
@@ -157,6 +184,7 @@ export class PeekPlayer {
       logger: logger || DEFAULT_LOGGER,
       autoUnmuteOnInteraction
     };
+    const normalizedSegments = normalizeSegments(segments);
     this.logger = this.options.logger;
     if (this.logger && typeof this.logger.setDebug === 'function') {
       this.logger.setDebug(!!debug);
@@ -166,12 +194,14 @@ export class PeekPlayer {
     this.autoplay = !!autoplay;
     this.autoNext = !!autoNext;
     this.options.controls = { ...(options.controls || {}) };
+    this.options.segments = normalizedSegments;
     this.logger.log('🎬 PeekPlayer initialized with options:', {
       autoplay: this.autoplay,
       autoNext: this.autoNext,
       poster: !!poster,
       debug: !!debug,
-      autoUnmuteOnInteraction: !!autoUnmuteOnInteraction
+      autoUnmuteOnInteraction: !!autoUnmuteOnInteraction,
+      segments: normalizedSegments.length
     });
     if (poster) {
       this.video.poster = poster;
@@ -270,10 +300,12 @@ export class PeekPlayer {
       logger: this.logger,
       callbacks,
       controls: this.options.controls || {},
+      segments: this.options.segments || [],
       context: {
         player: this,
         overlayContainer: this.overlayContainer
-      }
+      },
+      segmentAutoSkip: this.options.segmentAutoSkip
     });
   }
 
@@ -293,12 +325,14 @@ export class PeekPlayer {
 
   updateOptions(partialOptions = {}) {
     assertType(partialOptions, 'object', 'partialOptions', { component: 'PeekPlayer', method: 'updateOptions' });
+    let shouldRefreshControls = false;
 
     const {
       autoplay,
       autoNext,
       autoUnmuteOnInteraction,
       controls: controlsUpdate,
+      segments,
       logger,
       ...otherOptions
     } = partialOptions;
@@ -359,6 +393,22 @@ export class PeekPlayer {
         ...(this.options.controls || {}),
         ...controlsUpdate
       };
+      shouldRefreshControls = true;
+    }
+
+    if (typeof segments !== 'undefined') {
+      const normalizedSegments = normalizeSegments(segments);
+      this.options.segments = normalizedSegments;
+      shouldRefreshControls = true;
+    }
+
+    if (typeof partialOptions.segmentAutoSkip !== 'undefined') {
+      this.options.segmentAutoSkip = partialOptions.segmentAutoSkip;
+      console.log(this.options.segmentAutoSkip);
+      shouldRefreshControls = true;
+    }
+
+    if (shouldRefreshControls) {
       this.refreshControls();
     }
   }

@@ -34,7 +34,7 @@ export function setupOverlayControls(video, container, options = {}) {
   });
   
   // Initialize all controls
-  const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek);
+  const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek, options);
   const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context, logger });
   const { element: pausedOverlay, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange);
   

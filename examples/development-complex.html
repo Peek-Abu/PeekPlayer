@@ -162,6 +162,28 @@
         <button class="dev-action" id="refresh-controls">Refresh Controls Layout</button>
         <p class="status-line" id="player-status">Waiting for player…</p>
       </div>
+
+      <div class="control-group">
+        <h3>Segments</h3>
+        <div class="toggle">
+          <label for="toggle-segment-autoskip">
+            <input type="checkbox" id="toggle-segment-autoskip">
+            <span>Enable Segment Auto-Skip</span>
+          </label>
+        </div>
+        <div class="toggle">
+          <label for="segment-autoskip-labels">
+            <span>Skip Labels (comma separated)</span>
+          </label>
+        </div>
+        <input id="segment-autoskip-labels" type="text" placeholder="Intro, Recap" style="width:100%;padding:6px 8px;border-radius:6px;border:none;margin-bottom:8px;" />
+        <div class="toggle">
+          <label for="segment-autoskip-offset">
+            <span>Offset After Skip (seconds)</span>
+          </label>
+        </div>
+        <input id="segment-autoskip-offset" type="number" min="0" step="0.1" value="0" style="width:100%;padding:6px 8px;border-radius:6px;border:none;" />
+      </div>
     </aside>
   </div>
 
@@ -192,6 +214,7 @@
 
     function syncUI(player) {
       const controlsConfig = player.options.controls || {};
+      const autoSkipOptions = player.options.segmentAutoSkip || null;
 
       document.getElementById('toggle-autoplay').checked = !!player.autoplay;
       document.getElementById('toggle-auto-next').checked = !!player.autoNext;
@@ -199,6 +222,21 @@
       document.getElementById('toggle-skip-previous').checked = controlsConfig.skipPrevious !== false;
       document.getElementById('toggle-skip-next').checked = controlsConfig.skipNext !== false;
       document.getElementById('toggle-pip').checked = controlsConfig.pip !== false;
+      document.getElementById('toggle-segment-autoskip').checked = !!autoSkipOptions;
+
+      const labelsField = document.getElementById('segment-autoskip-labels');
+      const offsetField = document.getElementById('segment-autoskip-offset');
+
+      if (autoSkipOptions) {
+        const labels = Array.isArray(autoSkipOptions.labels)
+          ? autoSkipOptions.labels
+          : Array.from(autoSkipOptions.labels || []);
+        labelsField.value = labels.join(', ');
+        offsetField.value = typeof autoSkipOptions.offsetAfter === 'number' ? autoSkipOptions.offsetAfter : 0;
+      } else {
+        labelsField.value = '';
+        offsetField.value = 0;
+      }
     }
 
     function initDevControls(player) {
@@ -233,6 +271,52 @@
         player.refreshControls();
         statusLine.textContent = 'Controls refreshed at ' + new Date().toLocaleTimeString();
       });
+
+      document.getElementById('toggle-segment-autoskip').addEventListener('change', (event) => {
+        console.log(event.target.checked);
+        const enabled = event.target.checked;
+        if (!enabled) {
+          player.updateOptions({ segmentAutoSkip: null });
+          return;
+        }
+
+        const labels = parseLabelInput(document.getElementById('segment-autoskip-labels').value);
+        const offsetAfter = parseFloat(document.getElementById('segment-autoskip-offset').value) || 0;
+        player.updateOptions({
+          segmentAutoSkip: {
+            labels,
+            offsetAfter,
+          }
+        });
+      });
+
+      document.getElementById('segment-autoskip-labels').addEventListener('blur', () => {
+        if (!document.getElementById('toggle-segment-autoskip').checked) {
+          return;
+        }
+
+        const labels = parseLabelInput(document.getElementById('segment-autoskip-labels').value);
+        player.updateOptions({
+          segmentAutoSkip: {
+            ...(player.options.segmentAutoSkip || {}),
+            labels
+          }
+        });
+      });
+
+      document.getElementById('segment-autoskip-offset').addEventListener('blur', () => {
+        if (!document.getElementById('toggle-segment-autoskip').checked) {
+          return;
+        }
+
+        const offsetAfter = parseFloat(document.getElementById('segment-autoskip-offset').value) || 0;
+        player.updateOptions({
+          segmentAutoSkip: {
+            ...(player.options.segmentAutoSkip || {}),
+            offsetAfter
+          }
+        });
+      });
     }
 
     waitForPlayer()
@@ -241,6 +325,13 @@
         statusLine.textContent = 'Player failed to initialize';
         console.error('PeekPlayer dev controls failed to attach:', error);
       });
+
+    function parseLabelInput(input) {
+      return input
+        .split(',')
+        .map((label) => label.trim())
+        .filter(Boolean);
+    }
   </script>
 </body>
 </html>
