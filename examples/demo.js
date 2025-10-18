@@ -71,6 +71,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // autoUnmuteOnInteraction: true,
     poster: 'https://dummyimage.com/1920x1080/000/fff&text=PeekPlayer',
     debug: false,
+    nativeControlsForMobile: true,
     controls: {
       skipNext: false,
     },

@@ -305,7 +305,8 @@ export class PeekPlayer {
         player: this,
         overlayContainer: this.overlayContainer
       },
-      segmentAutoSkip: this.options.segmentAutoSkip
+      segmentAutoSkip: this.options.segmentAutoSkip,
+      nativeControlsForMobile: !!this.options.nativeControlsForMobile
     });
   }
 

@@ -17,13 +17,51 @@ export function setupOverlayControls(video, container, options = {}) {
     callbacks = {},
     logger,
     controls: controlsConfig = {},
-    context = {}
+    context = {},
+    nativeControlsForMobile = false
   } = options;
   assertType(callbacks, 'object', 'callbacks', { component: 'Controls', method: 'setupOverlayControls' });
   assertType(controlsConfig, 'object', 'controlsConfig', { component: 'Controls', method: 'setupOverlayControls' });
   assertType(context, 'object', 'context', { component: 'Controls', method: 'setupOverlayControls' });
+  assertType(nativeControlsForMobile, 'boolean', 'nativeControlsForMobile', { component: 'Controls', method: 'setupOverlayControls' });
   
   container.innerHTML = '';
+  const hasWindow = typeof window !== 'undefined';
+  const hasNavigator = typeof navigator !== 'undefined';
+  const coarsePointer = hasWindow && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
+  const isTouchDevice = (hasWindow && 'ontouchstart' in window) || (hasNavigator && (navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0));
+  if (nativeControlsForMobile && (isTouchDevice || coarsePointer)) {
+    const hadControlsAttr = video.hasAttribute('controls');
+    const hadPlaysInlineAttr = video.hasAttribute('playsinline');
+    const previousControlsAttr = video.getAttribute('controls');
+    const previousPlaysInlineAttr = video.getAttribute('playsinline');
+    const previousControls = video.controls;
+    const previousDisplay = container.style.display;
+    container.style.display = 'none';
+    video.controls = true;
+    if (!hadControlsAttr) {
+      video.setAttribute('controls', '');
+    }
+    if (!hadPlaysInlineAttr) {
+      video.setAttribute('playsinline', '');
+    }
+    container.classList.add('native-mobile-controls');
+    return () => {
+      container.classList.remove('native-mobile-controls');
+      container.style.display = previousDisplay;
+      if (!hadControlsAttr) {
+        video.removeAttribute('controls');
+      } else if (previousControlsAttr !== null) {
+        video.setAttribute('controls', previousControlsAttr);
+      }
+      if (!hadPlaysInlineAttr) {
+        video.removeAttribute('playsinline');
+      } else if (previousPlaysInlineAttr !== null) {
+        video.setAttribute('playsinline', previousPlaysInlineAttr);
+      }
+      video.controls = previousControls;
+    };
+  }
   
   // Get player wrapper for interactions
   const playerWrapper = document.getElementById('player-wrapper');
