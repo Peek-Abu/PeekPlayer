@@ -1,18 +1,19 @@
 // Native HLS Engine Wrapper
 export class HLSWrapper {
-  constructor(videoElement, hlsConfig = {}, logger) {
+  constructor(videoElement, hlsConfig = {}, logger, options = {}) {
     this.video = videoElement;
     this.hls = null;
     this.sourcesData = null;
     this.hlsConfig = hlsConfig;
     this.logger = logger;
+    this.useNativeIfSupported = options.useNativeIfSupported !== undefined ? options.useNativeIfSupported : true;
   }
 
   async initialize(hlsUrl) {
     this.logger.log('🎬 Initializing HLS Engine', hlsUrl);
 
     // Check if browser supports HLS natively (Safari/iOS)
-    if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
+    if (this.useNativeIfSupported && this.video.canPlayType('application/vnd.apple.mpegurl')) {
       this.logger.log('🎬 Using native HLS support');
       this.video.src = hlsUrl;
       return this;

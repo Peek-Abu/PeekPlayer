@@ -46,6 +46,49 @@ export function setupOverlayControls(video, container, options = {}) {
       video.setAttribute('playsinline', '');
     }
     container.classList.add('native-mobile-controls');
+
+    const cleanupFns = [];
+    const addListener = (target, event, handler, options) => {
+      target.addEventListener(event, handler, options);
+      cleanupFns.push(() => target.removeEventListener(event, handler, options));
+    };
+
+    if (callbacks.onPlaybackChange) {
+      addListener(video, 'play', () => callbacks.onPlaybackChange(true));
+      addListener(video, 'pause', () => callbacks.onPlaybackChange(false));
+    }
+
+    if (callbacks.onVolumeChange) {
+      addListener(video, 'volumechange', () => callbacks.onVolumeChange(video.muted ? 0 : video.volume));
+    }
+
+    if (callbacks.onTimeUpdate) {
+      addListener(video, 'timeupdate', () => callbacks.onTimeUpdate(video.currentTime, video.duration));
+    }
+
+    if (callbacks.onSeek) {
+      let lastReported = video.currentTime;
+      const reportSeek = () => {
+        const nextTime = video.currentTime;
+        const delta = nextTime - lastReported;
+        callbacks.onSeek(nextTime, delta, video.duration ? nextTime / video.duration : 0);
+        lastReported = nextTime;
+      };
+      addListener(video, 'seeking', reportSeek);
+      addListener(video, 'seeked', reportSeek);
+    }
+
+    if (callbacks.onFullscreen) {
+      const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
+      const handleFullscreenChange = () => callbacks.onFullscreen(!!document.fullscreenElement);
+      fullscreenEvents.forEach((evt) => addListener(document, evt, handleFullscreenChange));
+    }
+
+    if (callbacks.onPipChange) {
+      addListener(video, 'enterpictureinpicture', () => callbacks.onPipChange(true));
+      addListener(video, 'leavepictureinpicture', () => callbacks.onPipChange(false));
+    }
+
     return () => {
       container.classList.remove('native-mobile-controls');
       container.style.display = previousDisplay;
@@ -60,6 +103,13 @@ export function setupOverlayControls(video, container, options = {}) {
         video.setAttribute('playsinline', previousPlaysInlineAttr);
       }
       video.controls = previousControls;
+      cleanupFns.forEach((fn) => {
+        try {
+          fn();
+        } catch (error) {
+          logger?.warn?.('Failed to cleanup native control listener', error);
+        }
+      });
     };
   }
   

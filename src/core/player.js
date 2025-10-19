@@ -90,7 +90,9 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
       engine = new VideoJSWrapper(video);
       break;
     case 'hls':
-      engine = new HLSWrapper(video, options.hlsConfig, logger);
+      engine = new HLSWrapper(video, options.hlsConfig, logger, {
+        useNativeIfSupported: options.engine !== 'hls'
+      });
       break;
     case 'native':
     default:
