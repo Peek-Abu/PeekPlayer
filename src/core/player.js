@@ -1,7 +1,6 @@
 // PeekPlayer - Modular HTML5 Video Player
 import { setupOverlayControls } from './controls.js';
 import { HLSWrapper } from '../engines/hls-wrapper.js';
-import { VideoJSWrapper } from '../engines/videojs-wrapper.js';
 import { assert, assertExists, assertVideoElement, assertType } from '../utils/assert.js';
 
 const DEFAULT_LOGGER = {
@@ -56,10 +55,8 @@ function selectVideoEngine(options = {}, sources = [], logger = DEFAULT_LOGGER) 
   if (options.engine) return options.engine;
   
   const forceHLS = new URLSearchParams(window.location.search).get('engine') === 'hls';
-  const forceVJS = new URLSearchParams(window.location.search).get('engine') === 'videojs';
   
   if (forceHLS) return 'hls';
-  if (forceVJS) return 'videojs';
   
   // Auto-detect based on source URLs
   if (sources.length > 0) {
@@ -86,9 +83,6 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
   
   let engine;
   switch (engineType) {
-    case 'videojs':
-      engine = new VideoJSWrapper(video);
-      break;
     case 'hls':
       engine = new HLSWrapper(video, options.hlsConfig, logger, {
         useNativeIfSupported: options.engine !== 'hls'

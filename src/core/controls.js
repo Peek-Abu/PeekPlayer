@@ -28,9 +28,24 @@ export function setupOverlayControls(video, container, options = {}) {
   container.innerHTML = '';
   const hasWindow = typeof window !== 'undefined';
   const hasNavigator = typeof navigator !== 'undefined';
-  const coarsePointer = hasWindow && typeof window.matchMedia === 'function' && window.matchMedia('(pointer: coarse)').matches;
-  const isTouchDevice = (hasWindow && 'ontouchstart' in window) || (hasNavigator && (navigator.maxTouchPoints > 0 || navigator.msMaxTouchPoints > 0));
-  if (nativeControlsForMobile && (isTouchDevice || coarsePointer)) {
+  const maxTouchPoints = hasNavigator ? (navigator.maxTouchPoints || navigator.msMaxTouchPoints || 0) : 0;
+  const supportsMatchMedia = hasWindow && typeof window.matchMedia === 'function';
+  const coarsePointer = supportsMatchMedia && window.matchMedia('(pointer: coarse)').matches;
+  const finePointer = supportsMatchMedia && window.matchMedia('(pointer: fine)').matches;
+  const canHover = supportsMatchMedia && window.matchMedia('(hover: hover)').matches;
+  const isTouchCapable = (hasWindow && 'ontouchstart' in window) || maxTouchPoints > 0;
+  const isMobileUserAgent = hasNavigator && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '');
+  const viewportWidth = hasWindow ? window.innerWidth : undefined;
+  const shouldUseNativeControls = nativeControlsForMobile && (
+    isMobileUserAgent || (
+      isTouchCapable && !canHover && (
+        coarsePointer ||
+        (!finePointer && maxTouchPoints > 1) ||
+        (typeof viewportWidth === 'number' && viewportWidth <= 900)
+      )
+    )
+  );
+  if (shouldUseNativeControls) {
     const hadControlsAttr = video.hasAttribute('controls');
     const hadPlaysInlineAttr = video.hasAttribute('playsinline');
     const previousControlsAttr = video.getAttribute('controls');

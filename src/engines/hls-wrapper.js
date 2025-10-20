@@ -1,3 +1,5 @@
+import Hls from 'hls.js';
+
 // Native HLS Engine Wrapper
 export class HLSWrapper {
   constructor(videoElement, hlsConfig = {}, logger, options = {}) {
@@ -20,7 +22,7 @@ export class HLSWrapper {
     }
 
     // Use HLS.js for other browsers
-    if (window.Hls && Hls.isSupported()) {
+    if (Hls && typeof Hls.isSupported === 'function' && Hls.isSupported()) {
       const defaultConfig = {
         enableWorker: true,
         lowLatencyMode: false,
@@ -62,7 +64,11 @@ export class HLSWrapper {
     }
 
     // Fallback to direct URL
-    this.logger.log('🎬 Using direct URL fallback');
+    if (!Hls) {
+      this.logger.error('🎬 Hls.js not found in bundle; falling back to direct URL');
+    } else {
+      this.logger.warn('🎬 Hls.js not supported in this environment; falling back to direct URL');
+    }
     this.video.src = hlsUrl;
     return this;
   }
