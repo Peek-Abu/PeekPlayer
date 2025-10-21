@@ -210,9 +210,11 @@ export class PeekPlayer {
     }
     this.autoUnmuteOnInteraction = !!autoUnmuteOnInteraction;
     this._handleVideoEnd = this._handleVideoEnd.bind(this);
+    this._handleHlsLevels = this._handleHlsLevels.bind(this);
     
     // Set up video event listeners
     this._setupVideoListeners();
+    this.video.addEventListener('peekplayer:hls-levels', this._handleHlsLevels);
     this._setupAutoUnmute();
   }
 
@@ -222,6 +224,33 @@ export class PeekPlayer {
       this.logger.error('🎬 Video error:', this.video.error);
     });
     this.video.addEventListener('ended', this._handleVideoEnd);
+  }
+
+  _handleHlsLevels(event) {
+    const detail = event?.detail;
+    if (!detail || !Array.isArray(detail.sources)) {
+      return;
+    }
+
+    this.logger.log('🎬 Updating sources from HLS levels:', detail.sources.length);
+    this.sourcesData = detail;
+
+    if (this.engine && typeof this.engine.setSourcesData === 'function') {
+      this.engine.setSourcesData(detail);
+    }
+
+    this._updateQualitySelector(detail);
+  }
+
+  _updateQualitySelector(sourcesData) {
+    if (!sourcesData || !Array.isArray(sourcesData.sources) || !this.controlsContainer) {
+      return;
+    }
+
+    const qualitySelector = this.controlsContainer.querySelector('.quality-selector');
+    if (qualitySelector && typeof qualitySelector.updateSources === 'function') {
+      qualitySelector.updateSources(sourcesData);
+    }
   }
 
   _setupAutoUnmute() {
@@ -304,6 +333,10 @@ export class PeekPlayer {
       segmentAutoSkip: this.options.segmentAutoSkip,
       nativeControlsForMobile: !!this.options.nativeControlsForMobile
     });
+
+    if (this.sourcesData) {
+      this._updateQualitySelector(this.sourcesData);
+    }
   }
 
   _teardownControls() {
@@ -502,7 +535,12 @@ export class PeekPlayer {
     if (!targetSource) {
       throw new Error(`Quality "${qualityOrIndex}" not found`);
     }
-    
+
+    if (typeof targetSource.hlsLevel === 'number' && typeof this.engine.switchLevel === 'function') {
+      await this.engine.switchLevel(targetSource.hlsLevel);
+      return this;
+    }
+
     await this.engine.switchSource(targetSource.url);
     return this;
   }
@@ -525,6 +563,7 @@ export class PeekPlayer {
     if (typeof this._autoUnmuteCleanup === 'function') {
       this._autoUnmuteCleanup();
     }
+    this.video.removeEventListener('peekplayer:hls-levels', this._handleHlsLevels);
   }
 }
 

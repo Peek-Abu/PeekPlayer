@@ -1,6 +1,5 @@
 // Demo-specific initialization logic
-import { PeekPlayer } from '../src/core/player.js';
-
+import { PeekPlayer } from '../dist/peekplayer.esm.js';
 function initMobileDebugger() {
   if (typeof window === 'undefined') {
     return;

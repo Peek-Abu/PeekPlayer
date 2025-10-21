@@ -54,6 +54,40 @@ export class HLSWrapper {
       // Event listeners
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
         this.logger.log('🎬 HLS manifest parsed');
+
+        const levels = Array.isArray(this.hls.levels) ? this.hls.levels : [];
+        if (levels.length) {
+          const mappedSources = levels
+            .map((level, index) => {
+              const levelUrl = Array.isArray(level.url) ? level.url[0] : level.url;
+              if (!levelUrl) return null;
+              const height = level.height || 0;
+              const width = level.width || 0;
+              const bandwidth = level.maxBitrate || level.bitrate || level.averageduration || 0;
+              const displayName = level.name || (height ? `${height}p` : bandwidth ? `${Math.round(bandwidth / 1000)} kbps` : `Level ${index + 1}`);
+
+              return {
+                url: levelUrl,
+                quality: displayName,
+                displayName,
+                height,
+                width,
+                bandwidth,
+                index,
+                hlsLevel: index
+              };
+            })
+            .filter(Boolean);
+
+          if (mappedSources.length) {
+            const sourcesData = {
+              headers: this.sourcesData?.headers || {},
+              sources: mappedSources
+            };
+            this.setSourcesData(sourcesData);
+            this.video.dispatchEvent(new CustomEvent('peekplayer:hls-levels', { detail: sourcesData }));
+          }
+        }
       });
 
       this.hls.on(Hls.Events.ERROR, (event, data) => {
@@ -70,6 +104,14 @@ export class HLSWrapper {
       this.logger.warn('🎬 Hls.js not supported in this environment; falling back to direct URL');
     }
     this.video.src = hlsUrl;
+    return this;
+  }
+
+  async switchLevel(levelIndex) {
+    if (this.hls && typeof levelIndex === 'number' && levelIndex >= 0) {
+      this.hls.currentLevel = levelIndex;
+      return this;
+    }
     return this;
   }
 

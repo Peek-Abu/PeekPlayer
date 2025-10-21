@@ -8,6 +8,9 @@ A professional HTML5 video player built from scratch with HLS support, custom co
 - **Custom Controls** - Professional UI with tooltips
 - **Keyboard Shortcuts** - Spacebar, arrows, F, M
 - **Mobile Friendly** - Touch gestures and responsive
+- **Auto Unmute** - Unmute on user interaction
+- **Auto Next** - Auto play next video in playlist
+- **Segmentation** - Segmented video playback
 - **Embed Support** - Easy iframe integration
 
 ## Installation
@@ -92,6 +95,15 @@ npm run build    # Build for production
 npm run dev      # Development with watch
 npm run serve    # Local server
 ```
+
+## Issue Tracking
+
+<p align="center">
+  <img src="docs/assets/Highfly-white-name.svg" alt="Highfly logo" height="60" />
+</p>
+
+PeekPlayer tracks bugs and feature requests in [Highfly](https://highfly.app). The issue board lives in the PeekPlayer workspace, where feature requests are tagged by release milestone and bugs receive severity labels.
+
 
 ## 📄 License
 
