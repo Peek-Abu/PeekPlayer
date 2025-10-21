@@ -1,11 +1,12 @@
 import { TIMING } from '../../constants/timing.js';
 
-export function createScrubberTooltip(scrubber, video) {
+export function createScrubberTooltip(scrubber, video, options = {}) {
     let hoverTime = null;
     let hoverX = 0;
     let tooltip = null;
     let showTimeout = null;
     let hideTimeout = null;
+    const getSegments = options.getSegments;
     
     function formatTime(seconds) {
         const mins = Math.floor(seconds / 60);
@@ -25,18 +26,38 @@ export function createScrubberTooltip(scrubber, video) {
         tooltip.className = 'tooltip tooltip--scrubber tooltip--top';
         tooltip.innerHTML = `
             <div class="tooltip__thumbnail"></div>
+            <div class="tooltip__segment-label"></div>
             <div class="tooltip__time">0:00</div>
         `;
         document.body.appendChild(tooltip);
         return tooltip;
     }
     
+    function findSegmentForTime(time) {
+        if (typeof getSegments !== 'function') return null;
+        const segments = getSegments();
+        if (!Array.isArray(segments) || !segments.length) return null;
+        return segments.find((segment) => time >= segment.start && time < segment.end) || null;
+    }
+
     function updateTooltipContent(time, thumbnailData = null) {
         if (!tooltip) return;
         
+        const segmentLabelElement = tooltip.querySelector('.tooltip__segment-label');
         const timeElement = tooltip.querySelector('.tooltip__time');
         const thumbnailElement = tooltip.querySelector('.tooltip__thumbnail');
-        
+
+        if (segmentLabelElement) {
+            const segment = findSegmentForTime(time);
+            if (segment?.label) {
+                segmentLabelElement.textContent = segment.label;
+                segmentLabelElement.style.display = 'block';
+            } else {
+                segmentLabelElement.textContent = '';
+                segmentLabelElement.style.display = 'none';
+            }
+        }
+
         if (timeElement) {
             timeElement.textContent = formatTime(time);
         }

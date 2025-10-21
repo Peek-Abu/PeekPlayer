@@ -1,25 +1,29 @@
+import Hls from 'hls.js';
+
 // Native HLS Engine Wrapper
 export class HLSWrapper {
-  constructor(videoElement) {
+  constructor(videoElement, hlsConfig = {}, logger, options = {}) {
     this.video = videoElement;
     this.hls = null;
     this.sourcesData = null;
+    this.hlsConfig = hlsConfig;
+    this.logger = logger;
+    this.useNativeIfSupported = options.useNativeIfSupported !== undefined ? options.useNativeIfSupported : true;
   }
 
   async initialize(hlsUrl) {
-    console.log('🎬 Initializing HLS Engine');
+    this.logger.log('🎬 Initializing HLS Engine', hlsUrl);
 
     // Check if browser supports HLS natively (Safari/iOS)
-    if (this.video.canPlayType('application/vnd.apple.mpegurl')) {
-      console.log('🎬 Using native HLS support');
+    if (this.useNativeIfSupported && this.video.canPlayType('application/vnd.apple.mpegurl')) {
+      this.logger.log('🎬 Using native HLS support');
       this.video.src = hlsUrl;
       return this;
     }
 
     // Use HLS.js for other browsers
-    if (window.Hls && Hls.isSupported()) {
-      console.log('Using HLS.js');
-      this.hls = new Hls({
+    if (Hls && typeof Hls.isSupported === 'function' && Hls.isSupported()) {
+      const defaultConfig = {
         enableWorker: true,
         lowLatencyMode: false,
         // Encryption and codec handling
@@ -38,6 +42,10 @@ export class HLSWrapper {
         debug: false,
         // Handle encrypted streams better
         emeEnabled: true,
+      }
+      this.hls = new Hls({
+        ...defaultConfig,
+        ...this.hlsConfig
       });
 
       this.hls.loadSource(hlsUrl);
@@ -45,19 +53,65 @@ export class HLSWrapper {
 
       // Event listeners
       this.hls.on(Hls.Events.MANIFEST_PARSED, () => {
-        console.log('🎬 HLS manifest parsed');
+        this.logger.log('🎬 HLS manifest parsed');
+
+        const levels = Array.isArray(this.hls.levels) ? this.hls.levels : [];
+        if (levels.length) {
+          const mappedSources = levels
+            .map((level, index) => {
+              const levelUrl = Array.isArray(level.url) ? level.url[0] : level.url;
+              if (!levelUrl) return null;
+              const height = level.height || 0;
+              const width = level.width || 0;
+              const bandwidth = level.maxBitrate || level.bitrate || level.averageduration || 0;
+              const displayName = level.name || (height ? `${height}p` : bandwidth ? `${Math.round(bandwidth / 1000)} kbps` : `Level ${index + 1}`);
+
+              return {
+                url: levelUrl,
+                quality: displayName,
+                displayName,
+                height,
+                width,
+                bandwidth,
+                index,
+                hlsLevel: index
+              };
+            })
+            .filter(Boolean);
+
+          if (mappedSources.length) {
+            const sourcesData = {
+              headers: this.sourcesData?.headers || {},
+              sources: mappedSources
+            };
+            this.setSourcesData(sourcesData);
+            this.video.dispatchEvent(new CustomEvent('peekplayer:hls-levels', { detail: sourcesData }));
+          }
+        }
       });
 
       this.hls.on(Hls.Events.ERROR, (event, data) => {
-        console.error('🎬 HLS Error:', data);
+        this.logger.error('🎬 HLS Error:', data);
       });
 
       return this;
     }
 
     // Fallback to direct URL
-    console.log('🎬 Using direct URL fallback');
+    if (!Hls) {
+      this.logger.error('🎬 Hls.js not found in bundle; falling back to direct URL');
+    } else {
+      this.logger.warn('🎬 Hls.js not supported in this environment; falling back to direct URL');
+    }
     this.video.src = hlsUrl;
+    return this;
+  }
+
+  async switchLevel(levelIndex) {
+    if (this.hls && typeof levelIndex === 'number' && levelIndex >= 0) {
+      this.hls.currentLevel = levelIndex;
+      return this;
+    }
     return this;
   }
 

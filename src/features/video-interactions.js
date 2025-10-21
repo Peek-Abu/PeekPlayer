@@ -34,10 +34,10 @@ export function setupVideoInteractions(video, playerWrapper, hooks = {}) {
         // Toggle play/pause
         if (video.paused) {
             video.play();
-            if (hooks.onPlay) hooks.onPlay();
+            if (hooks.onPlaybackChange) hooks.onPlaybackChange(true);
         } else {
             video.pause();
-            if (hooks.onPause) hooks.onPause();
+            if (hooks.onPlaybackChange) hooks.onPlaybackChange(false);
         }
     }
     
@@ -51,7 +51,6 @@ export function setupVideoInteractions(video, playerWrapper, hooks = {}) {
             } else if (playerWrapper.msRequestFullscreen) {
                 playerWrapper.msRequestFullscreen();
             }
-            if (hooks.onFullscreenEnter) hooks.onFullscreenEnter();
         } else {
             if (document.exitFullscreen) {
                 document.exitFullscreen();
@@ -60,7 +59,6 @@ export function setupVideoInteractions(video, playerWrapper, hooks = {}) {
             } else if (document.msExitFullscreen) {
                 document.msExitFullscreen();
             }
-            if (hooks.onFullscreenExit) hooks.onFullscreenExit();
         }
     }
     

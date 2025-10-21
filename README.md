@@ -8,6 +8,9 @@ A professional HTML5 video player built from scratch with HLS support, custom co
 - **Custom Controls** - Professional UI with tooltips
 - **Keyboard Shortcuts** - Spacebar, arrows, F, M
 - **Mobile Friendly** - Touch gestures and responsive
+- **Auto Unmute** - Unmute on user interaction
+- **Auto Next** - Auto play next video in playlist
+- **Segmentation** - Segmented video playback
 - **Embed Support** - Easy iframe integration
 
 ## Installation
@@ -62,6 +65,29 @@ player.switchQuality(0);       // by index (0 = highest quality)
 - `getSources()` - Get available sources
 - `destroy()` - Clean up player resources
 
+## Customizing Controls & Callbacks
+
+When instantiating `PeekPlayer`, you can provide:
+
+```javascript
+const player = new PeekPlayer({
+  videoElement: document.querySelector('video'),
+  controlsContainer: document.getElementById('custom-controls'),
+  overlayContainer: document.getElementById('overlay-container'),
+  controls: {
+    skipPrevious: false,
+    skipNext: false,
+    quality: true
+  },
+  onPlaybackChange: (playing) => console.log('Playback state:', playing),
+  onSeek: (newTime, delta) => console.log('Seeked to:', newTime ?? delta),
+  onVolumeChange: (volume) => console.log('Volume:', volume),
+  onQualityChange: (qualityLabel) => console.log('Quality:', qualityLabel)
+});
+```
+
+Control visibility is handled via the `controls` object, while interactive lifecycle hooks (playback, seeking, fullscreen, etc.) are passed as top-level callback options. Internally, the player forwards these as `{ callbacks, controls, context }` to `setupOverlayControls()` for a clear separation of behavior, configuration, and context.
+
 ## 🛠️ Development
 
 ```bash
@@ -69,6 +95,15 @@ npm run build    # Build for production
 npm run dev      # Development with watch
 npm run serve    # Local server
 ```
+
+## Issue Tracking
+
+<p align="center">
+  <img src="docs/assets/Highfly-white-name.svg" alt="Highfly logo" height="60" />
+</p>
+
+PeekPlayer tracks bugs and feature requests in [Highfly](https://highfly.app). The issue board lives in the PeekPlayer workspace, where feature requests are tagged by release milestone and bugs receive severity labels.
+
 
 ## 📄 License
 

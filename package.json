@@ -22,7 +22,7 @@
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
-    "serve": "http-server . -p 3001 -c-1",
+    "serve": "http-server . -p 3001 -a 0.0.0.0",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -48,13 +48,13 @@
     "url": "https://github.com/peek-abu/PeekPlayer/issues"
   },
   "dependencies": {
-    "hls.js": "1.5.20"
+    "hls.js": ">=1.5.20"
   },
   "devDependencies": {
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-terser": "^0.4.4",
-    "rollup": "^4.9.6",
-    "http-server": "^14.1.1"
+    "http-server": "^14.1.1",
+    "rollup": "^4.9.6"
   },
   "peerDependencies": {
     "hls.js": ">=1.5.20"

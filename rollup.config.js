@@ -31,27 +31,20 @@ export default {
       file: 'dist/peekplayer.js',
       format: 'umd',
       name: 'PeekPlayer',
-      exports: 'named',
-      globals: {
-        'hls.js': 'Hls'
-      }
+      exports: 'named'
     },
     {
       file: 'dist/peekplayer.min.js',
       format: 'umd',
       name: 'PeekPlayer',
       exports: 'named',
-      plugins: [terser()],
-      globals: {
-        'hls.js': 'Hls'
-      }
+      plugins: [terser()]
     },
     {
       file: 'dist/peekplayer.esm.js',
       format: 'es'
     }
   ],
-  external: ['hls.js'],
   plugins: [
     nodeResolve(),
     copyAssets()

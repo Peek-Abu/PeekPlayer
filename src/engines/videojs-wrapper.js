@@ -1,13 +1,14 @@
 // Video.js Engine Wrapper
 export class VideoJSWrapper {
-  constructor(videoElement) {
+  constructor(videoElement, logger) {
     this.video = videoElement;
     this.player = null;
     this.sourcesData = null;
+    this.logger = logger;
   }
 
   async initialize(hlsUrl) {
-    console.log('🎬 Initializing Video.js Engine');
+    this.logger.log('🎬 Initializing Video.js Engine');
 
     this.player = videojs(this.video, {
       controls: false,
@@ -38,17 +39,17 @@ export class VideoJSWrapper {
     });
 
     this.player.ready(() => {
-        console.log('🎬 Video.js tech:', this.player.tech_.name_);
-        console.log('🎬 Video.js source:', this.player.currentSrc());
+        this.logger.log('🎬 Video.js tech:', this.player.tech_.name_);
+        this.logger.log('🎬 Video.js source:', this.player.currentSrc());
 
         // Log what Video.js is actually trying to play
         this.player.on('loadstart', () => {
-            console.log('🎬 Video.js loadstart:', this.player.currentSrc());
+            this.logger.log('🎬 Video.js loadstart:', this.player.currentSrc());
         });
     });
     return new Promise((resolve) => {
       this.player.ready(() => {
-        console.log('🎬 Video.js player ready');
+        this.logger.log('🎬 Video.js player ready');
         resolve(this);
       });
     });

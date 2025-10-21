@@ -3,7 +3,8 @@ import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { assertVideoElement, assertExists, assertType, assertFunction, assert } from '../utils/assert.js';
 
-export function createQualitySelector(video, player) {
+export function createQualitySelector(video, hooks = {}, logger) {
+    const { player, onQualityChange } = hooks;
     // Assert required parameters
     assertVideoElement(video, { component: 'QualitySelector', method: 'createQualitySelector' });
     assertExists(player, 'player', { component: 'QualitySelector', method: 'createQualitySelector' });
@@ -11,7 +12,7 @@ export function createQualitySelector(video, player) {
     // Handle case where sourcesData is not yet available (during initialization)
     const sourcesData = player.sourcesData;
     if (!sourcesData) {
-        console.log('🎬 Quality selector: sourcesData not available yet, creating placeholder');
+        logger.log('🎬 Quality selector: sourcesData not available yet, creating placeholder');
         // Return a hidden placeholder that will be updated later
         const container = document.createElement('div');
         container.className = 'quality-selector';
@@ -66,13 +67,13 @@ export function createQualitySelector(video, player) {
         // Hide quality selector if only one quality available
         if (qualities.length <= 1) {
             container.style.display = 'none';
-            console.log('🎬 Only one quality available, hiding quality selector');
+            logger.log('🎬 Only one quality available, hiding quality selector');
             return;
         } else {
             container.style.display = 'flex';
         }
         
-        console.log('🎬 Building quality menu with:', qualities);
+        logger.log('🎬 Building quality menu with:', qualities);
         availableQualities = qualities;
         menu.innerHTML = '';
         
@@ -89,10 +90,16 @@ export function createQualitySelector(video, player) {
         });
         
         updateMenuSelection();
-        console.log('🎬 Quality menu built with', menu.children.length, 'options');
+        logger.log('🎬 Quality menu built with', menu.children.length, 'options');
     }
     
     // Switch to different quality source
+    const notifyQualityChange = (quality) => {
+        if (!onQualityChange) return;
+        const label = quality.displayName || quality.quality || `${quality.height}p`;
+        onQualityChange(label);
+    };
+
     function selectQuality(qualityIndex) {
         assertType(qualityIndex, 'number', 'qualityIndex', { 
             component: 'QualitySelector', 
@@ -109,7 +116,7 @@ export function createQualitySelector(video, player) {
             return;
         }
         
-        console.log('🎬 Switching to quality:', qualityIndex, availableQualities[qualityIndex]);
+        logger.log('🎬 Switching to quality:', qualityIndex, availableQualities[qualityIndex]);
         
         const newQuality = availableQualities[qualityIndex];
         assertExists(newQuality, 'newQuality', { 
@@ -140,22 +147,23 @@ export function createQualitySelector(video, player) {
         
         // Switch source
         if (player) {
-            const headers = player.headers || {};
+            assertFunction(player.switchQuality, 'player.switchQuality', {
+                component: 'QualitySelector',
+                method: 'selectQuality'
+            });
+
+            logger.log('🎬 Using player.switchQuality()');
             
-            // Check if it's HLSWrapper (has switchSource method)
-                console.log('🎬 Using HLSWrapper.switchSource()');
-                
-                // HLSWrapper method
-                player.switchSource(newQuality.url).then(() => {
-                    // Restore playback state
-                    if (wasPlaying) {
-                        video.play();
-                    }
-                    showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
-                }).catch(error => {
-                    console.error('🎬 Quality switch failed:', error);
-                    showNotification('Quality switch failed', 'error');
-                });
+            player.switchQuality(qualityIndex).then(() => {
+                if (wasPlaying) {
+                    video.play();
+                }
+                showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                notifyQualityChange(newQuality);
+            }).catch(error => {
+                logger.error('🎬 Quality switch failed:', error);
+                showNotification('Quality switch failed', 'error');
+            });
         } else if (video) {
             // Native video element method
             video.src = newQuality.url;
@@ -167,6 +175,7 @@ export function createQualitySelector(video, player) {
                     video.play();
                 }
                 showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                notifyQualityChange(newQuality); // Added this line
             }, { once: true });
         }
         
@@ -276,7 +285,7 @@ export function createQualitySelector(video, player) {
         buildQualityMenu(sourcesData.sources);
     } else {
         // Fallback for demo
-        console.log('🎬 No sources provided, using demo qualities');
+        logger.log('🎬 No sources provided, using demo qualities');
         const demoQualities = [
             { height: 1080, width: 1920, url: '', label: '1080p', isDub: false, index: 0 },
             { height: 720, width: 1280, url: '', label: '720p', isDub: false, index: 1 },
@@ -306,6 +315,7 @@ export function createQualitySelector(video, player) {
             buildQualityMenu(newSourcesData.sources);
             currentQuality = 0; // Reset to first quality
             updateQualityDisplay();
+            notifyQualityChange(newSourcesData.sources[0]);
         }
     };
     

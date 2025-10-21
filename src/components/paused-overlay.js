@@ -1,7 +1,21 @@
 import { ICONS } from '../constants/icons.js';
 
-export function createPausedOverlay(video, onPlay) {
-    const overlay = document.getElementById('overlay-container');
+export function createPausedOverlay(video, onPlaybackChange) {
+    let overlay = document.getElementById('overlay-container');
+
+    if (!overlay) {
+        overlay = document.createElement('div');
+        overlay.id = 'overlay-container';
+        overlay.style.position = 'absolute';
+        overlay.style.top = '0';
+        overlay.style.right = '0';
+        overlay.style.bottom = '0';
+        overlay.style.left = '0';
+        const wrapper = video.closest('#player-wrapper');
+        if (wrapper) {
+            wrapper.appendChild(overlay);
+        }
+    }
     
     // Centered play button
     const playButton = document.createElement('button');
@@ -14,7 +28,7 @@ export function createPausedOverlay(video, onPlay) {
     playButton.onclick = (e) => {
         e.stopPropagation();
         video.play();
-        if (onPlay) onPlay();
+        if (onPlaybackChange) onPlaybackChange(true);
     };
     
     // Show/hide based on video state
@@ -48,7 +62,8 @@ export function createPausedOverlay(video, onPlay) {
         video.removeEventListener('pause', updateVisibility);
         video.removeEventListener('loadeddata', updateVisibility);
         playButton.remove();
-        overlay.remove();
+        overlay.style.display = 'none';
+        overlay.style.opacity = '0';
     };
     return { element: overlay, cleanup };
 }
