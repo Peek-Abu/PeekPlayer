@@ -90,6 +90,25 @@ export class HLSWrapper {
         }
       });
 
+      this.hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+        const levelIndex = typeof data?.level === 'number' ? data.level : this.hls?.currentLevel;
+        if (typeof levelIndex !== 'number' || levelIndex < 0) {
+          return;
+        }
+
+        const sources = this.sourcesData?.sources || [];
+        const matchingSource = sources.find((source) =>
+          typeof source.hlsLevel === 'number' ? source.hlsLevel === levelIndex : source.index === levelIndex
+        ) || sources[levelIndex];
+
+        this.video.dispatchEvent(new CustomEvent('peekplayer:hls-level-switch', {
+          detail: {
+            levelIndex,
+            source: matchingSource || null
+          }
+        }));
+      });
+
       this.hls.on(Hls.Events.ERROR, (event, data) => {
         this.logger.error('🎬 HLS Error:', data);
       });

@@ -116,25 +116,155 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
   return engine;
 }
 
+function extractHeightFromString(value) {
+  if (!value) return null;
+  const stringValue = String(value);
+  const numericMatch = stringValue.match(/(\d{3,4})\s*(?:p\b|$)/i);
+  if (numericMatch) {
+    const parsed = parseInt(numericMatch[1], 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  if (/8k/i.test(stringValue)) return 4320;
+  if (/4k/i.test(stringValue)) return 2160;
+  if (/2k/i.test(stringValue)) return 1440;
+  return null;
+}
+
+function extractHeightFromSource(source) {
+  if (source && Number.isFinite(source.height)) {
+    return source.height;
+  }
+  const candidates = [source?.quality, source?.displayName, source?.label];
+  for (const candidate of candidates) {
+    const height = extractHeightFromString(candidate);
+    if (height) {
+      return height;
+    }
+  }
+  if (source && Number.isFinite(source.bandwidth)) {
+    const estimated = Math.round(Math.sqrt(source.bandwidth));
+    if (Number.isFinite(estimated) && estimated >= 144) {
+      return estimated;
+    }
+  }
+  return null;
+}
+
+function formatHeightLabel(height) {
+  if (!height) {
+    return 'Auto';
+  }
+  let suffix = '';
+  if (height >= 4320) {
+    suffix = ' 8K';
+  } else if (height >= 2160) {
+    suffix = ' 4K';
+  } else if (height >= 1440) {
+    suffix = ' QHD';
+  } else if (height >= 1080) {
+    suffix = ' Full HD';
+  } else if (height >= 720) {
+    suffix = ' HD';
+  }
+  return `${height}p${suffix}`;
+}
+
+function buildQualityDisplayName(source, height) {
+  const rawCandidates = [source?.displayName, source?.label, source?.quality];
+  const raw = rawCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+  const lowerRaw = raw?.toLowerCase() || '';
+  if (lowerRaw.includes('auto')) {
+    return 'Auto';
+  }
+  if (!raw) {
+    return formatHeightLabel(height);
+  }
+  const trimmed = raw.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return formatHeightLabel(parseInt(trimmed, 10));
+  }
+  if (/^\d+\s*p$/i.test(trimmed)) {
+    return formatHeightLabel(parseInt(trimmed, 10));
+  }
+  if (/^\d+\s*k$/i.test(trimmed)) {
+    if (height) {
+      return formatHeightLabel(height);
+    }
+    const value = parseInt(trimmed, 10);
+    if (Number.isFinite(value)) {
+      if (value >= 8) return formatHeightLabel(4320);
+      if (value >= 4) return formatHeightLabel(2160);
+      if (value >= 2) return formatHeightLabel(1440);
+    }
+  }
+  if (height && /^\d{3,4}$/i.test(trimmed.replace(/[^\d]/g, ''))) {
+    return formatHeightLabel(height);
+  }
+  return trimmed;
+}
+
+function isAutoQualityLabel(label) {
+  return typeof label === 'string' && label.trim().toLowerCase() === 'auto';
+}
+
+function getQualitySortWeight(source) {
+  if (isAutoQualityLabel(source.displayName)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return source.height || 0;
+}
+
 function processVideoSources(sourcesData) {
   if (!sourcesData?.sources?.length) return null;
-  
-  const processedSources = sourcesData.sources
-      .filter(source => source.url && source.quality)
-      .map((source, index) => {
-          const qualityMatch = source.quality.match(/(\d+)p/);
-          const height = qualityMatch ? parseInt(qualityMatch[1]) : 480;
-          
-          return {
-              ...source,
-              height,
-              width: Math.round(height * 16/9),
-              index,
-              displayName: source.quality
-          };
-      })
-      .sort((a, b) => b.height - a.height); // Sort by quality (highest first)
-  
+
+  let processedSources = sourcesData.sources
+    .filter((source) => source?.url && (source.quality || source.displayName || source.label))
+    .map((source, index) => {
+      const height = extractHeightFromSource(source) || 0;
+      const displayName = buildQualityDisplayName(source, height);
+      return {
+        ...source,
+        height,
+        width: height ? Math.round((height * 16) / 9) : undefined,
+        index,
+        displayName,
+      };
+    })
+    .sort((a, b) => {
+      const weightA = getQualitySortWeight(a);
+      const weightB = getQualitySortWeight(b);
+      if (weightA === weightB) {
+        return a.index - b.index;
+      }
+      return weightB - weightA;
+    });
+
+  if (processedSources.length > 1 && !processedSources.some((source) => isAutoQualityLabel(source.displayName))) {
+    const estimatedHeight = processedSources.reduce((best, source) => {
+      if (!source.height) {
+        return best;
+      }
+      if (!best) {
+        return source.height;
+      }
+      return Math.min(best, source.height);
+    }, 0);
+
+    const autoSource = {
+      url: processedSources[0].url,
+      quality: 'Auto',
+      displayName: 'Auto',
+      height: estimatedHeight || undefined,
+      width: estimatedHeight ? Math.round((estimatedHeight * 16) / 9) : undefined,
+      index: -1,
+      isAuto: true,
+    };
+
+    processedSources = [autoSource, ...processedSources];
+  }
+
   return { ...sourcesData, sources: processedSources };
 }
 
@@ -230,7 +360,9 @@ export class PeekPlayer {
     this.autoUnmuteOnInteraction = !!autoUnmuteOnInteraction;
     this._handleVideoEnd = this._handleVideoEnd.bind(this);
     this._handleHlsLevels = this._handleHlsLevels.bind(this);
-    
+    this._handleHlsLevelSwitch = this._handleHlsLevelSwitch.bind(this);
+    this._setCurrentQualitySource = this._setCurrentQualitySource.bind(this);
+
     // Set up video event listeners
     this._cleanupVideoListeners = this._setupVideoListeners();
     this._setupAutoUnmute();
@@ -250,6 +382,7 @@ export class PeekPlayer {
     this.video.addEventListener('error', this._onVideoError);
     this.video.addEventListener('ended', this._handleVideoEnd);
     this.video.addEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+    this.video.addEventListener('peekplayer:hls-level-switch', this._handleHlsLevelSwitch);
 
     return () => {
       if (this._onLoadedMetadata) {
@@ -262,6 +395,7 @@ export class PeekPlayer {
       }
       this.video.removeEventListener('ended', this._handleVideoEnd);
       this.video.removeEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+      this.video.removeEventListener('peekplayer:hls-level-switch', this._handleHlsLevelSwitch);
     };
   }
 
@@ -271,14 +405,74 @@ export class PeekPlayer {
       return;
     }
 
-    this.logger.log('Updating sources from HLS levels:', detail.sources.length);
-    this.sourcesData = detail;
-
-    if (this.engine && typeof this.engine.setSourcesData === 'function') {
-      this.engine.setSourcesData(detail);
+    const processed = processVideoSources(detail);
+    if (!processed?.sources?.length) {
+      this.logger.warn('Received HLS levels but none were valid after processing');
+      return;
     }
 
-    this._updateQualitySelector(detail);
+    this.logger.log('Updating sources from HLS levels:', processed.sources.length);
+    this.sourcesData = processed;
+
+    if (!this._currentQualitySource && processed.sources.length) {
+      this._currentQualitySource = processed.sources[0];
+    }
+
+    if (this.engine && typeof this.engine.setSourcesData === 'function') {
+      this.engine.setSourcesData(processed);
+    }
+
+    this._updateQualitySelector(processed);
+
+    const activeLevel = typeof detail.currentLevel === 'number' ? detail.currentLevel : null;
+    if (typeof activeLevel === 'number') {
+      const matching = processed.sources.find((source) =>
+        typeof source.hlsLevel === 'number' ? source.hlsLevel === activeLevel : source.index === activeLevel
+      );
+      if (matching) {
+        this._setCurrentQualitySource(matching);
+      }
+    }
+  }
+
+  _handleHlsLevelSwitch(event) {
+    const detail = event?.detail;
+    const source = detail?.source;
+    if (!source || !this.sourcesData?.sources?.length) {
+      return;
+    }
+
+    const matching = this.sourcesData.sources.find((candidate) => {
+      if (candidate.isAuto) {
+        return false;
+      }
+      if (typeof candidate.hlsLevel === 'number') {
+        return candidate.hlsLevel === source.hlsLevel;
+      }
+      return candidate.index === source.index;
+    }) || source;
+
+    this._setCurrentQualitySource(matching);
+  }
+
+  _setCurrentQualitySource(source) {
+    if (!source) {
+      return;
+    }
+
+    this._currentQualitySource = source;
+
+    if (this.controlsContainer) {
+      const qualitySelector = this.controlsContainer.querySelector('.quality-selector');
+      if (qualitySelector && typeof qualitySelector.setActiveQuality === 'function') {
+        qualitySelector.setActiveQuality(source);
+      }
+    }
+
+    if (typeof this.options.onQualityChange === 'function') {
+      const displayName = source.displayName || source.quality || (source.height ? `${source.height}p` : 'Auto');
+      this.options.onQualityChange(displayName);
+    }
   }
 
   _updateQualitySelector(sourcesData) {
@@ -289,6 +483,9 @@ export class PeekPlayer {
     const qualitySelector = this.controlsContainer.querySelector('.quality-selector');
     if (qualitySelector && typeof qualitySelector.updateSources === 'function') {
       qualitySelector.updateSources(sourcesData);
+      if (this._currentQualitySource && typeof qualitySelector.setActiveQuality === 'function') {
+        qualitySelector.setActiveQuality(this._currentQualitySource);
+      }
     }
   }
 
@@ -544,16 +741,20 @@ export class PeekPlayer {
     this._isDestroyed = false;
     const sourcesData = { sources, headers };
     const processedSources = processVideoSources(sourcesData);
-    
+
     if (!processedSources?.sources?.length) {
       throw new Error('No valid sources provided');
     }
-    
+
     this.sourcesData = processedSources;
-    
+
+    if (processedSources.sources.length) {
+      this._currentQualitySource = processedSources.sources[0];
+    }
+
     // Load the highest quality source first
     const initialSource = processedSources.sources[0];
-    
+
     // Initialize engine with sources for proper engine selection
     this.engine = await initializeVideoEngine(this.video, initialSource.url, this.options, processedSources.sources, this.logger);
     this.video._engine = this.engine;

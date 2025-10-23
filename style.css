@@ -553,13 +553,15 @@ button:focus {
 .quality-menu {
   position: absolute;
   bottom: 100%;
-  right: 50%; 
+  right: 50%;
   transform: translateX(50%);
   margin-bottom: 8px;
   background: rgba(0, 0, 0, 0.9);
   border-radius: 6px;
   padding: 4px 0;
-  min-width: 80px;
+  min-width: 120px;
+  max-height: 50vh;
+  overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 1000;
 }

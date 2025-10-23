@@ -37,20 +37,99 @@ export function createQualitySelector(video, hooks = {}, logger) {
     const menu = document.createElement('div');
     menu.className = 'quality-menu';
     menu.style.display = 'none';
+    menu.style.overflowY = 'auto';
     
     let isMenuOpen = false;
     let availableQualities = [];
     let currentQuality = 0; // Start with first quality
     let currentTime = 0;
     let wasPlaying = false;
-    
+
     // Update quality display
     function updateQualityDisplay() {
         const quality = availableQualities[currentQuality];
-        const qualityText = quality ? `${quality.height}p` : 'Auto';
+        const qualityText = getQualityLabel(quality);
         button.setAttribute('aria-label', `Quality: ${qualityText}`);
     }
-    
+
+    const getQualityLabel = (quality) => {
+        if (!quality) {
+            return 'Auto';
+        }
+        const baseLabel = typeof quality.displayName === 'string' && quality.displayName.trim().length
+            ? quality.displayName
+            : quality.height
+                ? `${quality.height}p`
+                : typeof quality.quality === 'string' && quality.quality.trim().length
+                    ? quality.quality
+                    : 'Auto';
+        return quality.isDub ? `${baseLabel} (Dub)` : baseLabel;
+    };
+
+    const findQualityIndex = (target) => {
+        if (!target) {
+            return -1;
+        }
+        return availableQualities.findIndex((candidate) => {
+            if (candidate.isAuto && target.isAuto) {
+                return true;
+            }
+            if (typeof candidate.hlsLevel === 'number' && typeof target.hlsLevel === 'number') {
+                return candidate.hlsLevel === target.hlsLevel;
+            }
+            if (candidate.url && target.url) {
+                return candidate.url === target.url;
+            }
+            if (typeof candidate.index === 'number' && typeof target.index === 'number') {
+                return candidate.index === target.index;
+            }
+            return false;
+        });
+    };
+
+    const updateAutoLabelFromSource = (activeSource) => {
+        const autoIndex = availableQualities.findIndex((quality) => quality.isAuto);
+        if (autoIndex === -1) {
+            return;
+        }
+
+        const autoQuality = availableQualities[autoIndex];
+        const activeLabel = getQualityLabel(activeSource);
+        autoQuality.displayName = `Auto (${activeLabel})`;
+        autoQuality.activeHeight = activeSource?.height || autoQuality.height;
+        if (autoQuality.activeHeight) {
+            autoQuality.height = autoQuality.activeHeight;
+        }
+
+        const options = menu.querySelectorAll('.quality-option');
+        const autoOptionNode = options[autoIndex];
+        if (autoOptionNode) {
+            autoOptionNode.textContent = autoQuality.displayName;
+        }
+    };
+
+    const setActiveQuality = (targetSource) => {
+        if (!targetSource) {
+            return;
+        }
+
+        if (!targetSource.isAuto) {
+            updateAutoLabelFromSource(targetSource);
+        }
+
+        let nextIndex = findQualityIndex(targetSource);
+        if (nextIndex === -1 && !targetSource.isAuto) {
+            updateAutoLabelFromSource(targetSource);
+            nextIndex = availableQualities.findIndex((quality) => quality.isAuto);
+        }
+
+        if (nextIndex !== -1) {
+            currentQuality = nextIndex;
+            updateQualityDisplay();
+            updateMenuSelection();
+        }
+    };
+
     // Build quality menu
     function buildQualityMenu(qualities) {
         assert(
@@ -74,16 +153,16 @@ export function createQualitySelector(video, hooks = {}, logger) {
         }
         
         logger.log('🎬 Building quality menu with:', qualities);
-        availableQualities = qualities;
+        availableQualities = qualities.map((quality) => ({ ...quality }));
         menu.innerHTML = '';
         
         // Add quality options
-        qualities.forEach((quality, index) => {
+        availableQualities.forEach((quality, index) => {
             const option = document.createElement('button');
             option.className = 'quality-option';
             
         // Use the pre-processed displayName
-        option.textContent = quality.displayName;
+            option.textContent = quality.displayName;
         
         option.onclick = () => selectQuality(index);
         menu.appendChild(option);
@@ -96,7 +175,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
     // Switch to different quality source
     const notifyQualityChange = (quality) => {
         if (!onQualityChange) return;
-        const label = quality.displayName || quality.quality || `${quality.height}p`;
+        const label = getQualityLabel(quality);
         onQualityChange(label);
     };
 
@@ -143,7 +222,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
         currentQuality = qualityIndex;
         
         // Show loading notification
-        showNotification(`Switching to ${newQuality.height}p...`, 'loading');
+        showNotification(`Switching to ${getQualityLabel(newQuality)}...`, 'loading');
         
         // Switch source
         if (player) {
@@ -158,7 +237,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
                 if (wasPlaying) {
                     video.play();
                 }
-                showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                showNotification(`Quality: ${getQualityLabel(newQuality)}`, 'success');
                 notifyQualityChange(newQuality);
             }).catch(error => {
                 logger.error('🎬 Quality switch failed:', error);
@@ -174,7 +253,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
                 if (wasPlaying) {
                     video.play();
                 }
-                showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                showNotification(`Quality: ${getQualityLabel(newQuality)}`, 'success');
                 notifyQualityChange(newQuality); // Added this line
             }, { once: true });
         }
@@ -248,20 +327,75 @@ export function createQualitySelector(video, hooks = {}, logger) {
         });
     }
     
-    // Toggle menu
+    const getPlayerWrapper = () => {
+        if (hooks && hooks.playerWrapper instanceof HTMLElement) {
+            return hooks.playerWrapper;
+        }
+        if (player && player.playerWrapper instanceof HTMLElement) {
+            return player.playerWrapper;
+        }
+        const fallback = video.closest('.peekplayer-wrapper');
+        return fallback instanceof HTMLElement ? fallback : null;
+    };
+
+    const repositionMenu = () => {
+        if (!isMenuOpen) {
+            return;
+        }
+
+        menu.style.position = 'absolute';
+        menu.style.left = 'auto';
+        menu.style.right = '0';
+
+        const wrapper = getPlayerWrapper();
+        const buttonRect = button.getBoundingClientRect();
+        const wrapperRect = wrapper?.getBoundingClientRect();
+        const viewportHeight = typeof window !== 'undefined' ? (window.innerHeight || document.documentElement?.clientHeight || 0) : 0;
+
+        let spaceAbove = Number.POSITIVE_INFINITY;
+        let spaceBelow = Number.POSITIVE_INFINITY;
+
+        if (wrapperRect && buttonRect) {
+            spaceAbove = Math.max(0, buttonRect.top - wrapperRect.top - 8);
+            spaceBelow = Math.max(0, wrapperRect.bottom - buttonRect.bottom - 8);
+
+            const baseWidth = Math.max(120, Math.ceil(buttonRect.width + 40));
+            const maxAllowed = Math.min(320, Math.max(baseWidth, Math.floor(wrapperRect.width - 16)));
+            menu.style.minWidth = `${baseWidth}px`;
+            menu.style.maxWidth = `${maxAllowed}px`;
+            menu.style.width = 'auto';
+        } else {
+            menu.style.minWidth = '120px';
+            menu.style.maxWidth = '';
+            menu.style.width = 'auto';
+        }
+
+        const openedDownwards = spaceBelow > spaceAbove;
+        const availableSpace = openedDownwards ? spaceBelow : spaceAbove;
+        const viewportLimit = viewportHeight > 32 ? viewportHeight - 32 : viewportHeight;
+        const computedMaxHeight = Math.max(120, Math.min(Math.floor(availableSpace), viewportLimit || 320));
+        menu.style.maxHeight = `${computedMaxHeight}px`;
+
+        if (openedDownwards) {
+            menu.style.top = 'calc(100% + 8px)';
+            menu.style.bottom = 'auto';
+        } else {
+            menu.style.bottom = 'calc(100% + 8px)';
+            menu.style.top = 'auto';
+        }
+    };
+
     function toggleMenu() {
-        isMenuOpen = !isMenuOpen;
-        menu.style.display = isMenuOpen ? 'block' : 'none';
-        
-        if (isMenuOpen) {
-            const rect = button.getBoundingClientRect();
-            menu.style.position = 'absolute';
-            menu.style.bottom = '100%';
-            menu.style.right = '0';
-            menu.style.marginBottom = '8px';
+        const shouldOpen = !isMenuOpen;
+        if (shouldOpen) {
+            isMenuOpen = true;
+            menu.style.display = 'block';
+            repositionMenu();
+        } else {
+            closeMenu();
         }
     }
-    
+
     function closeMenu() {
         isMenuOpen = false;
         menu.style.display = 'none';
@@ -272,13 +406,18 @@ export function createQualitySelector(video, hooks = {}, logger) {
         e.stopPropagation();
         toggleMenu();
     };
-    
+
     // Close menu when clicking outside
     document.addEventListener('click', (e) => {
         if (!container.contains(e.target)) {
             closeMenu();
         }
     });
+
+    const onWindowResize = () => repositionMenu();
+    if (typeof window !== 'undefined') {
+        window.addEventListener('resize', onWindowResize);
+    }
     
     // Initialize with sources data
     if (sourcesData && sourcesData.sources) {
@@ -302,7 +441,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
         ...TOOLTIP_CONFIG.DYNAMIC_FAST,
         getContent: () => {
             const quality = availableQualities[currentQuality];
-            const qualityText = quality ? `${quality.height}p${quality.isDub ? ' (Dub)' : ''}` : 'Quality';
+            const qualityText = getQualityLabel(quality);
             return qualityText;
         }
     });
@@ -318,10 +457,12 @@ export function createQualitySelector(video, hooks = {}, logger) {
             notifyQualityChange(newSourcesData.sources[0]);
         }
     };
-    
-    return { element: container, cleanup: () => {
+
+    return { element: container, setActiveQuality, cleanup: () => {
         cleanupTooltip();
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('resize', onWindowResize);
+        }
         button.removeEventListener('click', toggleMenu);
-        menu.removeEventListener('click', closeMenu);
     }};
 }
