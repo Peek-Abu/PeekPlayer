@@ -1,6 +1,6 @@
 import { TIMING } from '../constants/timing.js';
 
-export function setupKeyboardControls(video, hooks = {}) {
+export function setupKeyboardControls(video, hooks = {}, playerWrapper) {
     const VOLUME_STEP = 0.1;
     
     function handleKeyDown(e) {
@@ -95,15 +95,14 @@ export function setupKeyboardControls(video, hooks = {}) {
     }
     
     function toggleFullscreen() {
-        const playerWrapper = video.closest('#player-wrapper');
+        const wrapper = playerWrapper || video.closest('.peekplayer-wrapper') || video.parentElement;
+        if (!wrapper) return;
         if (!document.fullscreenElement) {
-            if (playerWrapper.requestFullscreen) {
-                playerWrapper.requestFullscreen();
+            if (wrapper.requestFullscreen) {
+                wrapper.requestFullscreen();
             }
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            }
+        } else if (document.exitFullscreen) {
+            document.exitFullscreen();
         }
     }
     

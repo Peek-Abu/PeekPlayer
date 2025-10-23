@@ -218,8 +218,10 @@ async function initializePeekPlayer() {
             throw new Error('No video URL provided. Use ?video=URL or ?quality_720p=URL etc.');
         }
 
-        video = document.getElementById('peek-video');
-        const container = document.getElementById('custom-controls');
+        const wrapper = document.querySelector('.peekplayer-wrapper') || document.body;
+        video = wrapper.querySelector('video');
+        const container = wrapper.querySelector('.peekplayer-controls');
+        const overlay = wrapper.querySelector('.peekplayer-overlay');
         
         assertExists(video, 'video element');
         assertExists(container, 'controls container');
@@ -258,7 +260,8 @@ async function initializePeekPlayer() {
                 if (document.fullscreenElement) {
                     document.exitFullscreen();
                 } else {
-                    document.getElementById('player-wrapper').requestFullscreen();
+                    const fullscreenWrapper = wrapper || video.parentElement;
+                    fullscreenWrapper?.requestFullscreen?.();
                 }
             },
             onQualityChange: (qualityLabel) => {
@@ -269,7 +272,9 @@ async function initializePeekPlayer() {
 
         controlsCleanup = setupOverlayControls(video, container, {
             callbacks,
-            context: { player: engine }
+            context: { player: engine, playerWrapper: wrapper },
+            playerWrapper: wrapper,
+            overlayContainer: overlay
         });
 
         // Set up video event listeners for PostMessage API

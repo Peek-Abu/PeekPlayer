@@ -1,7 +1,7 @@
 // PeekPlayer - Modular HTML5 Video Player
 import { setupOverlayControls } from './controls.js';
 import { HLSWrapper } from '../engines/hls-wrapper.js';
-import { assert, assertExists, assertVideoElement, assertType } from '../utils/assert.js';
+import { assert, assertElement, assertExists, assertVideoElement, assertType } from '../utils/assert.js';
 
 const DEFAULT_LOGGER = {
   debugEnabled: false,
@@ -147,6 +147,7 @@ export class PeekPlayer {
       videoElement,
       controlsContainer,
       overlayContainer,
+      playerWrapper,
       engine,
       hlsConfig,
       autoplay = false,
@@ -161,14 +162,32 @@ export class PeekPlayer {
     // Validate required elements
     assertVideoElement(videoElement, { component: 'PeekPlayer', method: 'constructor' });
     assertExists(controlsContainer, 'controlsContainer', { component: 'PeekPlayer', method: 'constructor' });
+    const resolvedWrapper = playerWrapper
+      || controlsContainer?.closest('.peekplayer-wrapper')
+      || videoElement.closest('.peekplayer-wrapper')
+      || controlsContainer?.parentElement
+      || videoElement.parentElement;
+    assertElement(resolvedWrapper, 'playerWrapper', {
+      component: 'PeekPlayer',
+      method: 'constructor',
+      note: 'Provide `playerWrapper` when instantiating PeekPlayer.'
+    });
     
     this.video = videoElement;
     this.controlsContainer = controlsContainer;
     this.overlayContainer = overlayContainer;
+    this.playerWrapper = resolvedWrapper;
+    this.playerWrapper.classList.add('peekplayer-wrapper');
+    this.controlsContainer.classList.add('peekplayer-controls');
+    if (this.overlayContainer) {
+      this.overlayContainer.classList.add('peekplayer-overlay');
+    }
     this.engine = null;
     this.sourcesData = null;
     this.controlsInitialized = false;
     this.controlsCleanup = null;
+    this._initControlsTimeout = null;
+    this._isDestroyed = false;
     this.options = {
       ...options,
       engine,
@@ -191,7 +210,7 @@ export class PeekPlayer {
     this.autoNext = !!autoNext;
     this.options.controls = { ...(options.controls || {}) };
     this.options.segments = normalizedSegments;
-    this.logger.log('🎬 PeekPlayer initialized with options:', {
+    this.logger.log('PeekPlayer initialized with options:', {
       autoplay: this.autoplay,
       autoNext: this.autoNext,
       poster: !!poster,
@@ -213,17 +232,37 @@ export class PeekPlayer {
     this._handleHlsLevels = this._handleHlsLevels.bind(this);
     
     // Set up video event listeners
-    this._setupVideoListeners();
-    this.video.addEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+    this._cleanupVideoListeners = this._setupVideoListeners();
     this._setupAutoUnmute();
   }
 
   _setupVideoListeners() {
-    this.video.addEventListener('loadedmetadata', () => this._initControls());
-    this.video.addEventListener('error', (e) => {
-      this.logger.error('🎬 Video error:', this.video.error);
-    });
+    if (!this._onLoadedMetadata) {
+      this._onLoadedMetadata = () => this._initControls();
+    }
+    if (!this._onVideoError) {
+      this._onVideoError = () => {
+        this.logger.error('Video error:', this.video.error);
+      };
+    }
+
+    this.video.addEventListener('loadedmetadata', this._onLoadedMetadata);
+    this.video.addEventListener('error', this._onVideoError);
     this.video.addEventListener('ended', this._handleVideoEnd);
+    this.video.addEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+
+    return () => {
+      if (this._onLoadedMetadata) {
+        this.video.removeEventListener('loadedmetadata', this._onLoadedMetadata);
+        this._onLoadedMetadata = null;
+      }
+      if (this._onVideoError) {
+        this.video.removeEventListener('error', this._onVideoError);
+        this._onVideoError = null;
+      }
+      this.video.removeEventListener('ended', this._handleVideoEnd);
+      this.video.removeEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+    };
   }
 
   _handleHlsLevels(event) {
@@ -232,7 +271,7 @@ export class PeekPlayer {
       return;
     }
 
-    this.logger.log('🎬 Updating sources from HLS levels:', detail.sources.length);
+    this.logger.log('Updating sources from HLS levels:', detail.sources.length);
     this.sourcesData = detail;
 
     if (this.engine && typeof this.engine.setSourcesData === 'function') {
@@ -264,7 +303,7 @@ export class PeekPlayer {
         return;
       }
 
-      this.logger.log('🎬 Auto-unmute triggered by user interaction');
+      this.logger.log('Auto-unmute triggered by user interaction');
       this.video.muted = false;
       this.video.removeAttribute('muted');
       cleanup();
@@ -286,12 +325,13 @@ export class PeekPlayer {
 
   _handleVideoEnd() {
     if (this.autoNext && typeof this.options.onSkip === 'function') {
-      this.logger.log('🎬 AutoNext triggered on ended');
+      this.logger.log('AutoNext triggered on ended');
       this.options.onSkip('next');
     }
   }
 
   _initControls(force = false) {
+    if (this._isDestroyed) return;
     if (this.controlsInitialized && !force) return;
 
     if (force && this.controlsCleanup) {
@@ -301,8 +341,9 @@ export class PeekPlayer {
     }
 
     if (this.controlsInitialized) return;
+    this._clearControlsFallback();
     this.controlsInitialized = true;
-    
+
     const callbackKeys = [
       'onPlaybackChange',
       'onSeek',
@@ -328,10 +369,13 @@ export class PeekPlayer {
       segments: this.options.segments || [],
       context: {
         player: this,
-        overlayContainer: this.overlayContainer
+        overlayContainer: this.overlayContainer,
+        playerWrapper: this.playerWrapper
       },
       segmentAutoSkip: this.options.segmentAutoSkip,
-      nativeControlsForMobile: !!this.options.nativeControlsForMobile
+      nativeControlsForMobile: !!this.options.nativeControlsForMobile,
+      playerWrapper: this.playerWrapper,
+      overlayContainer: this.overlayContainer
     });
 
     if (this.sourcesData) {
@@ -345,6 +389,27 @@ export class PeekPlayer {
       this.controlsCleanup = null;
     }
     this.controlsInitialized = false;
+  }
+
+  _clearControlsFallback() {
+    if (this._initControlsTimeout) {
+      clearTimeout(this._initControlsTimeout);
+      this._initControlsTimeout = null;
+    }
+  }
+
+  _scheduleControlsFallback() {
+    if (this._isDestroyed) {
+      return;
+    }
+    this._clearControlsFallback();
+    this._initControlsTimeout = setTimeout(() => {
+      if (this._isDestroyed || this.controlsInitialized) {
+        return;
+      }
+      this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
+      this._initControls();
+    }, 2000);
   }
 
   refreshControls() {
@@ -448,6 +513,7 @@ export class PeekPlayer {
     assertType(url, 'string', 'url', { component: 'PeekPlayer', method: 'loadSource' });
     
     try {
+      this._isDestroyed = false;
       // Pass current sources for engine selection
       const sources = this.sourcesData?.sources || [];
       this.engine = await initializeVideoEngine(this.video, url, this.options, sources, this.logger);
@@ -461,12 +527,7 @@ export class PeekPlayer {
       }
       
       // Force controls initialization after a delay if metadata doesn't load
-      setTimeout(() => {
-        if (!this.controlsInitialized) {
-          this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
-          this._initControls();
-        }
-      }, 2000);
+      this._scheduleControlsFallback();
       
       return this;
     } catch (error) {
@@ -480,6 +541,7 @@ export class PeekPlayer {
     assert(Array.isArray(sources), 'sources must be an array', { component: 'PeekPlayer', method: 'loadSources' });
     
     // Process and sort sources
+    this._isDestroyed = false;
     const sourcesData = { sources, headers };
     const processedSources = processVideoSources(sourcesData);
     
@@ -503,12 +565,7 @@ export class PeekPlayer {
     }
     
     // Force controls initialization after a delay if metadata doesn't load
-    setTimeout(() => {
-      if (!this.controlsInitialized) {
-        this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
-        this._initControls();
-      }
-    }, 2000);
+    this._scheduleControlsFallback();
     
     // Set sources data on the engine for quality switching
     if (this.engine && this.engine.setSourcesData) {
@@ -554,16 +611,20 @@ export class PeekPlayer {
   }
 
   destroy() {
+    this._isDestroyed = true;
     if (this.engine) {
       this.engine.destroy();
       this.engine = null;
     }
     this.sourcesData = null;
+    this._clearControlsFallback();
     this._teardownControls();
     if (typeof this._autoUnmuteCleanup === 'function') {
       this._autoUnmuteCleanup();
     }
-    this.video.removeEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+    if (typeof this._cleanupVideoListeners === 'function') {
+      this._cleanupVideoListeners();
+    }
   }
 }
 

@@ -106,7 +106,7 @@ export function createControlRow(video, options = {}) {
         appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
     }
     if (controlsConfig.fullscreen) {
-        const { element, cleanup } = createFullscreenButton(video.parentElement, callbacks.onFullscreen, logger);
+        const { element, cleanup } = createFullscreenButton(context.playerWrapper || video.parentElement, callbacks.onFullscreen, logger);
         cleanups.push(cleanup);
         appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
     }

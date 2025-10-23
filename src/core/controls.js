@@ -18,7 +18,9 @@ export function setupOverlayControls(video, container, options = {}) {
     logger,
     controls: controlsConfig = {},
     context = {},
-    nativeControlsForMobile = false
+    nativeControlsForMobile = false,
+    playerWrapper,
+    overlayContainer: overlayContainerOption
   } = options;
   assertType(callbacks, 'object', 'callbacks', { component: 'Controls', method: 'setupOverlayControls' });
   assertType(controlsConfig, 'object', 'controlsConfig', { component: 'Controls', method: 'setupOverlayControls' });
@@ -128,18 +130,17 @@ export function setupOverlayControls(video, container, options = {}) {
     };
   }
   
-  // Get player wrapper for interactions
-  const playerWrapper = document.getElementById('player-wrapper');
-  assertElement(playerWrapper, 'playerWrapper', { 
-    component: 'Controls', 
-    method: 'setupOverlayControls',
-    note: 'player-wrapper element not found in DOM' 
+  const resolvedWrapper = playerWrapper || context.playerWrapper || video.closest('.peekplayer-wrapper');
+  assertElement(resolvedWrapper, 'playerWrapper', {
+    component: 'Controls',
+    method: 'setupOverlayControls'
   });
-  
+  const overlayRoot = overlayContainerOption || context.overlayContainer || resolvedWrapper.querySelector('.peekplayer-overlay');
+
   // Initialize all controls
   const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek, options);
-  const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context, logger });
-  const { element: pausedOverlay, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange);
+  const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context: { ...context, playerWrapper: resolvedWrapper }, logger });
+  const { element: pausedOverlay, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange, resolvedWrapper, overlayRoot);
   
   // Assert control components were created successfully
   assertElement(scrubberBar, 'scrubberBar', { component: 'Controls', method: 'setupOverlayControls' });
@@ -151,10 +152,10 @@ export function setupOverlayControls(video, container, options = {}) {
   container.appendChild(controlRow);
     
   // Setup interactions and behaviors
-  const cleanupInteractions = setupVideoInteractions(video, playerWrapper, callbacks);
-  const cleanupKeyboard = setupKeyboardControls(video, callbacks);
-  const cleanupAutoHide = setupAutoHideControls(video, container, playerWrapper);
-  const cleanupMobileGestures = setupMobileGestures(video, playerWrapper);
+  const cleanupInteractions = setupVideoInteractions(video, resolvedWrapper, callbacks);
+  const cleanupKeyboard = setupKeyboardControls(video, callbacks, resolvedWrapper);
+  const cleanupAutoHide = setupAutoHideControls(video, container, resolvedWrapper);
+  const cleanupMobileGestures = setupMobileGestures(video, resolvedWrapper, context.player);
   const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
   const handleFullscreenChange = () => {
     if (callbacks.onFullscreen) {
@@ -177,6 +178,7 @@ export function setupOverlayControls(video, container, options = {}) {
     scrubberCleanup();
     controlRowCleanup();
     pausedOverlayCleanup();
+    console.log('controls cleanup');
     fullscreenEvents.forEach((evt) => document.removeEventListener(evt, handleFullscreenChange));
   };
 }

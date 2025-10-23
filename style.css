@@ -6,14 +6,14 @@ body {
   justify-content: center;
 }
 
-#player-wrapper {
+.peekplayer-wrapper {
   position: relative;
   width: 100%;
   background: #222;
   border-radius: 8px;
   box-shadow: 0 2px 12px #000a;
-  aspect-ratio: 16 / 9;  /* ✅ Maintains video ratio */
-  overflow: hidden;       /* ✅ Prevents control overflow */
+  aspect-ratio: 16 / 9;  /* Maintains video ratio */
+  overflow: hidden;       /* Prevents control overflow */
 }
 
 video {
@@ -31,7 +31,6 @@ video {
   position: relative;
   padding: 4px 0; /* Add padding for easier hover target */
 }
-
 
 .scrubber {
   flex: 1;
@@ -145,7 +144,7 @@ video {
   padding: 6px 4px;
 }
 
-#custom-controls {
+.peekplayer-controls {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -298,7 +297,7 @@ button:focus {
 }
 
 /* Paused Overlay with Vignette Effect */
-#overlay-container {
+.peekplayer-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -313,7 +312,7 @@ button:focus {
   z-index: 10;
 }
 
-#overlay-container.visible {
+.peekplayer-overlay.visible {
   opacity: 1;
   pointer-events: auto;
 }

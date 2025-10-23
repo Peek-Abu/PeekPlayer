@@ -8,6 +8,7 @@ export interface PeekPlayerOptions {
   videoElement?: HTMLVideoElement;
   controlsContainer?: HTMLElement;
   overlayContainer?: HTMLElement;
+  playerWrapper?: HTMLElement;
   engine?: 'hls' | 'videojs' | 'native' | 'auto';
 }
 

@@ -24,25 +24,30 @@ npm install @peekabu/peekplayer
 ```html
 <link rel="stylesheet" href="node_modules/@peekabu/peekplayer/style.css">
 
-<div id="player-wrapper">
-    <video id="peek-video" preload="auto" crossorigin=""></video>
-    <div id="custom-controls"></div>
-    <div id="overlay-container"></div>
+<div class="peekplayer-example">
+    <video class="peekplayer-example__video" preload="auto" crossorigin=""></video>
+    <div class="peekplayer-example__controls"></div>
+    <div class="peekplayer-example__overlay"></div>
 </div>
 
 <script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
 <script src="node_modules/@peekabu/peekplayer/dist/peekplayer.js"></script>
 
 <script>
+const wrapper = document.querySelector('.peekplayer-example');
+
 const player = new PeekPlayer({
-    videoElement: document.getElementById('peek-video'),
-    controlsContainer: document.getElementById('custom-controls'),
-    overlayContainer: document.getElementById('overlay-container')
+    videoElement: wrapper.querySelector('video'),
+    controlsContainer: wrapper.querySelector('.peekplayer-example__controls'),
+    overlayContainer: wrapper.querySelector('.peekplayer-example__overlay'),
+    playerWrapper: wrapper
 });
 
 player.loadSource('https://example.com/video.m3u8');
 </script>
 ```
+
+The `playerWrapper` option is optional; when omitted, PeekPlayer will resolve it from the supplied elements. Using direct element references keeps the markup flexible without relying on IDs.
 
 ## Multi-Quality Sources
 
@@ -99,10 +104,10 @@ npm run serve    # Local server
 ## Issue Tracking
 
 <p align="center">
-  <img src="docs/assets/Highfly-white-name.svg" alt="Highfly logo" height="60" />
+  <img src="docs/assets/Highfly.svg" alt="Highfly logo" height="60" />
 </p>
 
-PeekPlayer tracks bugs and feature requests in [Highfly](https://highfly.app). The issue board lives in the PeekPlayer workspace, where feature requests are tagged by release milestone and bugs receive severity labels.
+PeekPlayer tracks bugs and feature requests in [HighFly](https://highfly.app). The issue board lives in the PeekPlayer workspace, where feature requests are tagged by release milestone and bugs receive severity labels.
 
 
 ## 📄 License

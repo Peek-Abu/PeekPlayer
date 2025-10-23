@@ -1,20 +1,25 @@
 import { ICONS } from '../constants/icons.js';
 
-export function createPausedOverlay(video, onPlaybackChange) {
-    let overlay = document.getElementById('overlay-container');
+export function createPausedOverlay(video, onPlaybackChange, playerWrapper, overlayContainer) {
+    let overlay = overlayContainer || playerWrapper?.querySelector('.peekplayer-overlay');
+    let ownsOverlay = false;
 
     if (!overlay) {
         overlay = document.createElement('div');
-        overlay.id = 'overlay-container';
-        overlay.style.position = 'absolute';
-        overlay.style.top = '0';
-        overlay.style.right = '0';
-        overlay.style.bottom = '0';
-        overlay.style.left = '0';
-        const wrapper = video.closest('#player-wrapper');
-        if (wrapper) {
-            wrapper.appendChild(overlay);
-        }
+        overlay.className = 'peekplayer-overlay';
+        ownsOverlay = true;
+    } else {
+        overlay.classList.add('peekplayer-overlay');
+    }
+
+    overlay.style.position = 'absolute';
+    overlay.style.top = '0';
+    overlay.style.right = '0';
+    overlay.style.bottom = '0';
+    overlay.style.left = '0';
+
+    if (playerWrapper && overlay.parentElement !== playerWrapper) {
+        playerWrapper.appendChild(overlay);
     }
     
     // Centered play button
@@ -52,6 +57,7 @@ export function createPausedOverlay(video, onPlaybackChange) {
     video.addEventListener('loadeddata', updateVisibility);
     
     // Assembly
+    overlay.innerHTML = '';
     overlay.appendChild(playButton);
     
     // Initial state
@@ -62,8 +68,12 @@ export function createPausedOverlay(video, onPlaybackChange) {
         video.removeEventListener('pause', updateVisibility);
         video.removeEventListener('loadeddata', updateVisibility);
         playButton.remove();
+        overlay.innerHTML = '';
         overlay.style.display = 'none';
         overlay.style.opacity = '0';
+        if (ownsOverlay && overlay.parentElement) {
+            overlay.remove();
+        }
     };
     return { element: overlay, cleanup };
 }

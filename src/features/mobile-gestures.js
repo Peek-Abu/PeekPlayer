@@ -1,6 +1,6 @@
 import { TIMING } from '../constants/timing.js';
 
-export function setupMobileGestures(video, player) {
+export function setupMobileGestures(video, playerWrapper, player) {
     if (!('ontouchstart' in window)) return; // Skip on desktop
     
     let touchStartX = 0;
@@ -8,14 +8,14 @@ export function setupMobileGestures(video, player) {
     let touchStartTime = 0;
     let isSeeking = false;
     
-    video.addEventListener('touchstart', (e) => {
+    const handleTouchStart = (e) => {
         if (e.touches.length === 1) {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
             touchStartTime = Date.now();
         }
-    }, { passive: true });
-    video.addEventListener('touchmove', (e) => {
+    };
+    const handleTouchMove = (e) => {
         if (e.touches.length === 1 && !isSeeking) {
             const deltaX = e.touches[0].clientX - touchStartX;
             const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
@@ -35,15 +35,15 @@ export function setupMobileGestures(video, player) {
                 showSeekIndicator(seekAmount > 0 ? 'forward' : 'backward');
             }
         }
-    }, { passive: true });
+    };
     
-    video.addEventListener('touchend', () => {
+    const handleTouchEnd = () => {
         isSeeking = false;
-    }, { passive: true });
+    };
     
     // Double tap for fullscreen
     let lastTap = 0;
-    video.addEventListener('touchend', (e) => {
+    const handleTouchEndFullscreen = (e) => {
         const currentTime = Date.now();
         const tapLength = currentTime - lastTap;
         
@@ -52,15 +52,24 @@ export function setupMobileGestures(video, player) {
             if (document.fullscreenElement) {
                 document.exitFullscreen();
             } else {
-                video.requestFullscreen();
+                const wrapper = playerWrapper || video.closest('.peekplayer-wrapper') || video.parentElement;
+                if (wrapper?.requestFullscreen) {
+                    wrapper.requestFullscreen();
+                }
             }
         }
         lastTap = currentTime;
-    });
+    };
+    
+    video.addEventListener('touchstart', handleTouchStart, { passive: true });
+    video.addEventListener('touchmove', handleTouchMove, { passive: true });
+    video.addEventListener('touchend', handleTouchEnd, { passive: true });
+    video.addEventListener('touchend', handleTouchEndFullscreen);
     return () => {
-        video.removeEventListener('touchstart', (e) => {});
-        video.removeEventListener('touchmove', (e) => {});
-        video.removeEventListener('touchend', (e) => {});
+        video.removeEventListener('touchstart', handleTouchStart);
+        video.removeEventListener('touchmove', handleTouchMove);
+        video.removeEventListener('touchend', handleTouchEnd);
+        video.removeEventListener('touchend', handleTouchEndFullscreen);
     };
 }
 

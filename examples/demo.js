@@ -240,9 +240,10 @@ async function fetchSourcesData(params) {
 
 // Demo initialization
 document.addEventListener("DOMContentLoaded", async () => {
-  const video = document.getElementById('peek-video');
-  const controlsContainer = document.getElementById('custom-controls');
-  const overlayContainer = document.getElementById('overlay-container');
+  const wrapper = document.querySelector('.peekplayer-wrapper');
+  const video = wrapper?.querySelector('.peekplayer-video');
+  const controlsContainer = wrapper?.querySelector('.peekplayer-controls');
+  const overlayContainer = wrapper?.querySelector('.peekplayer-overlay');
   
   if (!video || !controlsContainer) {
     console.error('🎬 Required elements not found');
@@ -259,6 +260,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     videoElement: video,
     controlsContainer: controlsContainer,
     overlayContainer: overlayContainer,
+    playerWrapper: wrapper,
     // autoplay: true,
     autoNext: true,
     // autoUnmuteOnInteraction: true,
