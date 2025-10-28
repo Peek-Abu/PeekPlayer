@@ -2,7 +2,7 @@ import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 
-export function createSkipButtons(video, onSkip) {
+export function createSkipButtons(video, onSkip, options = {}) {
     // Previous episode button
     const prevBtn = document.createElement('button');
     prevBtn.className = 'skip-button skip-prev';
@@ -10,7 +10,8 @@ export function createSkipButtons(video, onSkip) {
     prevBtn.style.pointerEvents = 'auto';
     const prevTooltip = createTooltip(prevBtn, {
         ...TOOLTIP_CONFIG.STATIC_FAST,
-        text: 'Previous'
+        text: 'Previous',
+        isMobile: options.isMobile
     });
 
     prevBtn.innerHTML = ICONS.SKIP_PREVIOUS;
@@ -22,7 +23,8 @@ export function createSkipButtons(video, onSkip) {
     nextBtn.style.pointerEvents = 'auto';
     const nextTooltip = createTooltip(nextBtn, {
         ...TOOLTIP_CONFIG.STATIC_FAST,
-        text: 'Next'
+        text: 'Next',
+        isMobile: options.isMobile
     });
     
     nextBtn.innerHTML = ICONS.SKIP_NEXT;

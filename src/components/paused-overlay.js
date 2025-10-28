@@ -17,7 +17,9 @@ export function createPausedOverlay(video, onPlaybackChange, playerWrapper, over
     overlay.style.right = '0';
     overlay.style.bottom = '0';
     overlay.style.left = '0';
-
+    overlay.style.pointerEvents = 'none';
+    overlay.style.opacity = '1';
+    overlay.style.display = 'flex';
     if (playerWrapper && overlay.parentElement !== playerWrapper) {
         playerWrapper.appendChild(overlay);
     }
@@ -26,31 +28,26 @@ export function createPausedOverlay(video, onPlaybackChange, playerWrapper, over
     const playButton = document.createElement('button');
     playButton.className = 'paused-play-button';
     playButton.setAttribute('aria-label', 'Play');
-    
+    playButton.style.pointerEvents = 'auto';
     playButton.innerHTML = ICONS.PLAY;
     
     // Click handler
     playButton.onclick = (e) => {
         e.stopPropagation();
-        video.play();
-        if (onPlaybackChange) onPlaybackChange(true);
+        const isPaused = video.paused;
+        if (isPaused) {
+            video.play();
+        } else {
+            video.pause();
+        }
+        if (onPlaybackChange) onPlaybackChange(isPaused);
     };
-    
+
     // Show/hide based on video state
     function updateVisibility() {
-        if (video.paused) {
-            overlay.style.display = 'flex';
-            overlay.style.opacity = '1';
-        } else {
-            overlay.style.opacity = '0';
-            setTimeout(() => {
-                if (!video.paused) {
-                    overlay.style.display = 'none';
-                }
-            }, 300);
-        }
+        playButton.innerHTML = video.paused ? ICONS.PLAY : ICONS.PAUSE;
     }
-    
+
     // Video event listeners
     video.addEventListener('play', updateVisibility);
     video.addEventListener('pause', updateVisibility);
@@ -59,7 +56,6 @@ export function createPausedOverlay(video, onPlaybackChange, playerWrapper, over
     // Assembly
     overlay.innerHTML = '';
     overlay.appendChild(playButton);
-    
     // Initial state
     updateVisibility();
     
@@ -75,5 +71,5 @@ export function createPausedOverlay(video, onPlaybackChange, playerWrapper, over
             overlay.remove();
         }
     };
-    return { element: overlay, cleanup };
+    return { element: overlay, playPauseButton: playButton, cleanup };
 }

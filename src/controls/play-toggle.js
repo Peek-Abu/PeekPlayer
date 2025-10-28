@@ -2,7 +2,7 @@ import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 
-export function createPlayButton(video, onPlaybackChange) {
+export function createPlayButton(video, onPlaybackChange, options = {}) {
    
     const btn = document.createElement('button');
     btn.className = 'play-toggle-button';
@@ -23,7 +23,8 @@ export function createPlayButton(video, onPlaybackChange) {
     video.onpause = () => { btn.innerHTML = ICONS.PLAY; };
     const cleanupTooltip = createTooltip(btn, {
         ...TOOLTIP_CONFIG.DYNAMIC_FAST,
-        getContent: () => video.paused ? 'Play' : 'Pause'
+        getContent: () => video.paused ? 'Play' : 'Pause',
+        isMobile: options.isMobile
     });
     return { element: btn, cleanup: cleanupTooltip };
 }

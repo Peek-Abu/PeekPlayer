@@ -3,7 +3,7 @@ import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { assertVideoElement, assertExists, assertType, assertFunction, assert } from '../utils/assert.js';
 
-export function createQualitySelector(video, hooks = {}, logger) {
+export function createQualitySelector(video, hooks = {}, logger, options = {}) {
     const { player, onQualityChange } = hooks;
     // Assert required parameters
     assertVideoElement(video, { component: 'QualitySelector', method: 'createQualitySelector' });
@@ -443,7 +443,8 @@ export function createQualitySelector(video, hooks = {}, logger) {
             const quality = availableQualities[currentQuality];
             const qualityText = getQualityLabel(quality);
             return qualityText;
-        }
+        },
+        isMobile: options.isMobile
     });
     
     updateQualityDisplay();

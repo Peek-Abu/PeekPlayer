@@ -72,8 +72,9 @@ export function createScrubberBar(video, onSeek, options = {}) {
     updateScrubber();
 
     const cleanupTooltip = createScrubberTooltip(interactiveElement, video, {
-        getSegments
-    });
+        getSegments,
+        isMobile: options.isMobile
+    },);
 
     // Use requestAnimationFrame for smooth updates
     let animationFrame;
