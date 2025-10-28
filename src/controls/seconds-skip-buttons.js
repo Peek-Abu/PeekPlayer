@@ -3,7 +3,7 @@ import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { TIMING } from '../constants/timing.js';
 
-export function createSecondsSkipButtons(video, onSeek) {
+export function createSecondsSkipButtons(video, onSeek, options = {}) {
     // Skip backward 10 seconds button
     const skipBackBtn = document.createElement('button');
     skipBackBtn.className = 'skip-button skip-back';
@@ -11,7 +11,8 @@ export function createSecondsSkipButtons(video, onSeek) {
     skipBackBtn.style.pointerEvents = 'auto';
     const backTooltip = createTooltip(skipBackBtn, {
         ...TOOLTIP_CONFIG.STATIC_FAST,
-        text: `Skip back ${TIMING.SKIP_SECONDS}s`
+        text: `Skip back ${TIMING.SKIP_SECONDS}s`,
+        isMobile: options.isMobile
     });
     
     skipBackBtn.innerHTML = ICONS.SKIP_BACK_10;
@@ -24,7 +25,8 @@ export function createSecondsSkipButtons(video, onSeek) {
     
     const forwardTooltip = createTooltip(skipForwardBtn, {
         ...TOOLTIP_CONFIG.STATIC_FAST,
-        text: `Skip forward ${TIMING.SKIP_SECONDS}s`
+        text: `Skip forward ${TIMING.SKIP_SECONDS}s`,
+        isMobile: options.isMobile
     });
 
     skipForwardBtn.innerHTML = ICONS.SKIP_FORWARD_10;

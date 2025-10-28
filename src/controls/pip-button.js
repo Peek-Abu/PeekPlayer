@@ -2,7 +2,7 @@ import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 
-export function createPipButton(video, onPipChange, logger) {
+export function createPipButton(video, onPipChange, logger, options = {}) {
     const button = document.createElement('button');
     button.className = 'pip-button';
     button.style.pointerEvents = 'auto';
@@ -10,8 +10,8 @@ export function createPipButton(video, onPipChange, logger) {
     
     // Check if PiP is supported
     const isPipSupported = 'pictureInPictureEnabled' in document && document.pictureInPictureEnabled;
-    
     if (!isPipSupported) {
+        logger.warn('PiP is not supported');
         button.style.display = 'none';
         return button;
     }
@@ -76,7 +76,8 @@ export function createPipButton(video, onPipChange, logger) {
         getContent: () => {
             const isInPip = document.pictureInPictureElement === video;
             return isInPip ? 'Exit Picture in Picture' : 'Picture in Picture';
-        }
+        },
+        isMobile: options.isMobile
     });
     return { element: button, cleanup: () => {
         cleanupTooltip();

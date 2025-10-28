@@ -38,15 +38,14 @@ export function setupOverlayControls(video, container, options = {}) {
   const isTouchCapable = (hasWindow && 'ontouchstart' in window) || maxTouchPoints > 0;
   const isMobileUserAgent = hasNavigator && /android|iphone|ipad|ipod|mobile/i.test(navigator.userAgent || '');
   const viewportWidth = hasWindow ? window.innerWidth : undefined;
-  const shouldUseNativeControls = nativeControlsForMobile && (
-    isMobileUserAgent || (
-      isTouchCapable && !canHover && (
-        coarsePointer ||
-        (!finePointer && maxTouchPoints > 1) ||
-        (typeof viewportWidth === 'number' && viewportWidth <= 900)
-      )
+  const isMobile = isMobileUserAgent || (
+    isTouchCapable && !canHover && (
+      coarsePointer ||
+      (!finePointer && maxTouchPoints > 1) ||
+      (typeof viewportWidth === 'number' && viewportWidth <= 900)
     )
   );
+  const shouldUseNativeControls = nativeControlsForMobile && isMobile;
   if (shouldUseNativeControls) {
     const hadControlsAttr = video.hasAttribute('controls');
     const hadPlaysInlineAttr = video.hasAttribute('playsinline');
@@ -139,8 +138,8 @@ export function setupOverlayControls(video, container, options = {}) {
 
   // Initialize all controls
   const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek, options);
-  const { element: controlRow, cleanup: controlRowCleanup } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context: { ...context, playerWrapper: resolvedWrapper }, logger });
-  const { element: pausedOverlay, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange, resolvedWrapper, overlayRoot);
+  const { element: controlRow, cleanup: controlRowCleanup, childElements } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context: { ...context, playerWrapper: resolvedWrapper }, logger, isMobile });
+  const { element: pausedOverlay, playPauseButton, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange, resolvedWrapper, overlayRoot);
   
   // Assert control components were created successfully
   assertElement(scrubberBar, 'scrubberBar', { component: 'Controls', method: 'setupOverlayControls' });
@@ -148,13 +147,69 @@ export function setupOverlayControls(video, container, options = {}) {
   assertElement(pausedOverlay, 'pausedOverlay', { component: 'Controls', method: 'setupOverlayControls' });
   
   // Append to overlay
+  // container.appendChild(pausedOverlay);
   container.appendChild(scrubberBar);
-  container.appendChild(controlRow);
+  if (isMobile) {
+    const assignedElements = childElements || {};
+    controlRow.innerHTML = '';
+
+    const mobileLayout = document.createElement('div');
+    mobileLayout.className = 'controls-mobile';
+
+    const mobileTop = document.createElement('div');
+    mobileTop.className = 'controls-mobile__top';
+    const mobileTopLeft = document.createElement('div');
+    mobileTopLeft.className = 'controls-mobile__top-left';
+    const mobileTopRight = document.createElement('div');
+    mobileTopRight.className = 'controls-mobile__top-right';
+
+    const mobileBottom = document.createElement('div');
+    mobileBottom.className = 'controls-mobile__bottom';
+    const mobileBottomLeft = document.createElement('div');
+    mobileBottomLeft.className = 'controls-mobile__bottom-left';
+    const mobileBottomRight = document.createElement('div');
+    mobileBottomRight.className = 'controls-mobile__bottom-right';
+
+    const appendIfPresent = (target, element) => {
+      if (element && target) {
+        target.appendChild(element);
+      }
+    };
+    appendIfPresent(mobileTopRight, assignedElements.quality);
+    appendIfPresent(mobileTopLeft, assignedElements.pip);
+    appendIfPresent(mobileTopRight, assignedElements.volume);
+
+    appendIfPresent(mobileBottomLeft, assignedElements.timeDisplay);
+    appendIfPresent(mobileBottomRight, assignedElements.fullscreen);
+
+    if (mobileTopLeft.childNodes.length) {
+      mobileTop.appendChild(mobileTopLeft);
+    }
+    if (mobileTopRight.childNodes.length) {
+      mobileTop.appendChild(mobileTopRight);
+    }
+    if (mobileTop.childNodes.length) {
+      mobileLayout.appendChild(mobileTop);
+    }
+
+    if (mobileBottomLeft.childNodes.length) {
+      mobileBottom.appendChild(mobileBottomLeft);
+    }
+    if (mobileBottomRight.childNodes.length) {
+      mobileBottom.appendChild(mobileBottomRight);
+    }
+    if (mobileBottom.childNodes.length) {
+      mobileLayout.appendChild(mobileBottom);
+    }
+    container.appendChild(mobileLayout);
+  } else {
+    container.appendChild(controlRow);
+  }
     
   // Setup interactions and behaviors
   const cleanupInteractions = setupVideoInteractions(video, resolvedWrapper, callbacks);
   const cleanupKeyboard = setupKeyboardControls(video, callbacks, resolvedWrapper);
-  const cleanupAutoHide = setupAutoHideControls(video, container, resolvedWrapper);
+  const cleanupAutoHide = setupAutoHideControls(video, [container, playPauseButton], resolvedWrapper);
   const cleanupMobileGestures = setupMobileGestures(video, resolvedWrapper, context.player);
   const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
   const handleFullscreenChange = () => {
@@ -165,7 +220,7 @@ export function setupOverlayControls(video, container, options = {}) {
   fullscreenEvents.forEach((evt) => document.addEventListener(evt, handleFullscreenChange));
   
   // Mobile-specific adjustments
-  if ('ontouchstart' in window) {
+  if (isMobile) {
     // Disable tooltips on mobile
     container.classList.add('mobile');
   }
@@ -178,7 +233,6 @@ export function setupOverlayControls(video, container, options = {}) {
     scrubberCleanup();
     controlRowCleanup();
     pausedOverlayCleanup();
-    console.log('controls cleanup');
     fullscreenEvents.forEach((evt) => document.removeEventListener(evt, handleFullscreenChange));
   };
 }

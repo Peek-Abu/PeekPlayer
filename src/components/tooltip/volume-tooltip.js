@@ -1,7 +1,7 @@
 import { createTooltip } from './base-tooltip.js';
 import { TIMING } from '../../constants/timing.js';
 
-export function createVolumeTooltip(slider, video) {
+export function createVolumeTooltip(slider, video, options = {}) {
     let hoverValue = null;
     
     function getVolumeAtPosition(e) {
@@ -15,6 +15,7 @@ export function createVolumeTooltip(slider, video) {
         position: 'top',
         delay: TIMING.TOOLTIP_DELAY_FAST,
         dynamic: true,
+        isMobile: options.isMobile,
         getContent: () => {
             if (hoverValue !== null) {
                 const volume = Math.round(hoverValue * 100);

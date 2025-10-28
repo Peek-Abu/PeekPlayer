@@ -4,7 +4,7 @@ import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { TIMING } from '../constants/timing.js';
 import { assertVideoElement, assertExists, assertFunction, assertRange } from '../utils/assert.js';
 
-export function createVolumeControl(video, onVolumeChange) {
+export function createVolumeControl(video, onVolumeChange, options = {}) {
     // Assert required parameters
     assertVideoElement(video, { component: 'VolumeControl', method: 'createVolumeControl' });
     if (onVolumeChange) {
@@ -26,7 +26,8 @@ export function createVolumeControl(video, onVolumeChange) {
     muteBtn.style.pointerEvents = 'auto';
     const muteTooltip = createTooltip(muteBtn, {
         ...TOOLTIP_CONFIG.DYNAMIC_FAST,
-        getContent: () => video.muted ? 'Unmute' : 'Mute'
+        getContent: () => video.muted ? 'Unmute' : 'Mute',
+        isMobile: options.isMobile
     });
 
     // Volume slider (hidden by default)
@@ -42,8 +43,9 @@ export function createVolumeControl(video, onVolumeChange) {
     slider.value = Math.round(video.volume * 100);
     slider.setAttribute('aria-label', 'Volume');
     slider.style.pointerEvents = 'auto';
-    const volumeTooltip = createVolumeTooltip(slider, video);
-
+    const volumeTooltip = createVolumeTooltip(slider, video, {
+        isMobile: options.isMobile
+    });
     volumeSlider.appendChild(slider);
 
     // Function to update volume progress fill
@@ -103,8 +105,9 @@ export function createVolumeControl(video, onVolumeChange) {
     
     // Update volume slider when video volume changes
     video.addEventListener('volumechange', () => {
-        slider.value = Math.round(video.volume * 100);
-        updateVolumeProgress(); // Add this line
+        // If muted, set slider to 0, otherwise use current volume
+        slider.value = video.muted ? 0 : Math.round(video.volume * 100);
+        updateVolumeProgress();
         updateMuteIcon();
     });
     
@@ -112,7 +115,9 @@ export function createVolumeControl(video, onVolumeChange) {
     updateMuteIcon();
     updateVolumeProgress();
     container.appendChild(muteBtn);
-    container.appendChild(volumeSlider);
+    if (!options.isMobile) {
+        container.appendChild(volumeSlider);
+    }
     return { element: container, cleanup: () => {
         container.remove();
         muteTooltip();

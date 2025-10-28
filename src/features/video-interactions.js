@@ -48,6 +48,8 @@ export function setupVideoInteractions(video, playerWrapper, hooks = {}) {
                 playerWrapper.requestFullscreen();
             } else if (playerWrapper.webkitRequestFullscreen) {
                 playerWrapper.webkitRequestFullscreen();
+            } else if (video.webkitEnterFullscreen) {
+                video.webkitEnterFullscreen();
             } else if (playerWrapper.msRequestFullscreen) {
                 playerWrapper.msRequestFullscreen();
             }
@@ -56,6 +58,8 @@ export function setupVideoInteractions(video, playerWrapper, hooks = {}) {
                 document.exitFullscreen();
             } else if (document.webkitExitFullscreen) {
                 document.webkitExitFullscreen();
+            } else if (video.webkitExitFullscreen) {
+                video.webkitExitFullscreen();
             } else if (document.msExitFullscreen) {
                 document.msExitFullscreen();
             }

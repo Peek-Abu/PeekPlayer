@@ -154,6 +154,71 @@ video {
   z-index: 5;
 }
 
+.peekplayer-controls.mobile {
+  top: 0;
+  bottom: 0;
+  display: block;
+  padding: 0;
+  pointer-events: none; 
+}
+
+.peekplayer-controls.mobile .scrubber-row {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 12px 24px;
+  align-items: flex-end;
+}
+
+.controls-mobile {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0px 8px 16px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.controls-mobile__top,
+.controls-mobile__bottom {
+  pointer-events: auto;
+}
+
+.controls-mobile__top,
+.controls-mobile__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.controls-mobile__top {
+  margin-bottom: auto;
+}
+
+.controls-mobile__bottom {
+  align-items: flex-end;
+  padding-bottom: 8px;
+}
+
+.controls-mobile__top-left,
+.controls-mobile__top-right,
+.controls-mobile__bottom-left,
+.controls-mobile__bottom-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.controls-mobile button,
+.controls-mobile .time-display {
+  min-height: 44px;
+}
+
 /* Time Display Component */
 .time-display {
   display: flex;
@@ -601,14 +666,10 @@ button:focus {
     align-items: center;
     padding: 8px 12px;
   }
-  
-  /* Hide non-essential controls on mobile */
-  .skip-button,
-  .pip-button,
-  .volume-control {
-    display: none !important;
+  .paused-play-button {
+    width: 40px;
+    height: 40px;
   }
-  
   /* Essential mobile controls order: Play | Scrubber | Time | Fullscreen */
   .play-toggle-button { order: 1; }
   .scrubber-row { order: 2; flex: 1; }

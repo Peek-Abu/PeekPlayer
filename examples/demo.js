@@ -267,7 +267,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     poster: 'https://dummyimage.com/1920x1080/000/fff&text=PeekPlayer',
     debug: false,
     engine: 'hls',
-    nativeControlsForMobile: true,
+    nativeControlsForMobile: false,
     controls: {
       skipNext: false,
     },

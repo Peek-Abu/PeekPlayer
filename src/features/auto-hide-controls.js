@@ -1,6 +1,7 @@
+// Handles the auto-hide behavior for video player controls during playback.
 import { TIMING } from '../constants/timing.js';
 
-export function setupAutoHideControls(video, controlsElement, playerWrapper) {
+export function setupAutoHideControls(video, controlsElements, playerWrapper) {
     let hideTimeout = null;
     let isMouseOverPlayer = playerWrapper.matches(':hover');
     let controlsVisible = true;
@@ -19,8 +20,10 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
 
     function showControls() {
         if (!controlsVisible) {
-            controlsElement.style.opacity = '1';
-            controlsElement.style.pointerEvents = 'auto';
+            for (let i = 0; i < controlsElements.length; i++) {
+                controlsElements[i].style.opacity = '1';
+                controlsElements[i].style.pointerEvents = 'auto';
+            }
             controlsVisible = true;
         }
 
@@ -46,8 +49,10 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
 
     function hideControls() {
         if (controlsVisible && !video.paused) {
-            controlsElement.style.opacity = '0';
-            controlsElement.style.pointerEvents = 'none';
+            for (let i = 0; i < controlsElements.length; i++) {
+                controlsElements[i].style.opacity = '0';
+                controlsElements[i].style.pointerEvents = 'none';
+            }
             controlsVisible = false;
 
             // Hide vignette when controls are hidden
@@ -103,16 +108,20 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
         if (video.paused) {
             vignette.classList.add('paused');
             vignette.style.opacity = '1';
-            controlsElement.style.opacity = '1';
-            controlsElement.style.pointerEvents = 'auto';
+            for (let i = 0; i < controlsElements.length; i++) {
+                controlsElements[i].style.opacity = '1';
+                controlsElements[i].style.pointerEvents = 'auto';
+            }
             controlsVisible = true;
         }
     }
     
     // Set initial styles for smooth transitions
-    controlsElement.style.transition = `opacity ${TIMING.TRANSITION_DURATION}ms ease, pointer-events ${TIMING.TRANSITION_DURATION}ms ease`;
-    controlsElement.style.opacity = '1';
-    controlsElement.style.pointerEvents = 'auto';
+    for (let i = 0; i < controlsElements.length; i++) {
+        controlsElements[i].style.transition = `opacity ${TIMING.TRANSITION_DURATION}ms ease, pointer-events ${TIMING.TRANSITION_DURATION}ms ease`;
+        controlsElements[i].style.opacity = '1';
+        controlsElements[i].style.pointerEvents = 'auto';
+    }
     playerWrapper.style.cursor = 'default';
     video.style.cursor = 'default';
     
