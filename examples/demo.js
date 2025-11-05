@@ -231,10 +231,14 @@ async function fetchSourcesData(params) {
     headers: {}, 
     sources: [
       { 
-        url: 'https://demo.unified-streaming.com/k8s/features/stable/video/tears-of-steel/tears-of-steel.ism/.m3u8',
+        url: 'https://storage.googleapis.com/shaka-demo-assets/angel-one-hls/hls.m3u8',
         quality: "Sub · 1080p" 
       }
-    ]   
+    ],
+    // subtitleTracks: [
+    //   { src: '/subs/episode1-en.vtt', srclang: 'en', label: 'English', default: true },
+    //   { src: '/subs/episode1-es.vtt', srclang: 'es', label: 'Spanish' }
+    // ]  
   };
 }
 
@@ -265,7 +269,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     autoNext: true,
     // autoUnmuteOnInteraction: true,
     poster: 'https://dummyimage.com/1920x1080/000/fff&text=PeekPlayer',
-    debug: false,
+    debug: true,
     engine: 'hls',
     nativeControlsForMobile: false,
     controls: {
@@ -299,6 +303,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Load sources from URL parameters or use defaults
   const sourcesData = await fetchSourcesData(params);
   
+  const subtitleTracks = sourcesData.subtitleTracks || [];
   if (sourcesData?.sources?.length) {
     try {
       await player.loadSources(sourcesData.sources, sourcesData.headers || {});
@@ -314,10 +319,28 @@ document.addEventListener("DOMContentLoaded", async () => {
   // Handle subtitle parameter (if needed in future)
   const subtitleUrl = params.get('subtitle');
   if (subtitleUrl) {
+    const track = document.createElement('track');
+    track.dataset.peekplayer = 'subtitle';
+    track.kind = 'subtitles';
+    track.src = subtitleUrl;
+    track.srclang = 'en';
+    track.label = 'English';
+    track.default = true;
+    video.appendChild(track);
     // TODO: Implement subtitle loading
     console.log('🎬 Subtitle URL provided:', subtitleUrl);
   }
 
+  subtitleTracks.forEach(({ src, srclang, label, default: isDefault }) => {
+    const track = document.createElement('track');
+    track.dataset.peekplayer = 'subtitle';
+    track.kind = 'subtitles';
+    track.src = src;
+    track.srclang = srclang;
+    track.label = label;
+    if (isDefault) track.default = true;
+    video.appendChild(track);
+  });
   // Make player available globally for debugging
   window.peekPlayer = player;
 

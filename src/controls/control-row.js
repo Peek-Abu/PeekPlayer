@@ -5,6 +5,7 @@ import { createTimeDisplay } from './time-display.js';
 import { createSkipButtons } from './skip-buttons.js';
 import { createSecondsSkipButtons } from './seconds-skip-buttons.js';
 import { createQualitySelector } from './quality-selector.js';
+import { createSubtitleSelector } from './subtitle-selector.js';
 import { createPipButton } from './pip-button.js';
 
 export function createControlRow(video, options = {}) {
@@ -26,6 +27,7 @@ export function createControlRow(video, options = {}) {
         secondsSkipBack: true,
         secondsSkipForward: true,
         quality: true,
+        subtitles: true,
         pip: true,
         fullscreen: true
     };
@@ -101,6 +103,14 @@ export function createControlRow(video, options = {}) {
             appendElement(skipForwardBtn, applyAutoMargin && shouldApplyAutoMargin());
             childElements.secondsSkipForward = skipForwardBtn;
         }
+    }
+    if (controlsConfig.subtitles) {
+        const { element, cleanup } = createSubtitleSelector(video, {
+            onSubtitleChange: callbacks.onSubtitleChange
+        }, logger, { isMobile });
+        cleanups.push(cleanup);
+        appendElement(element, applyAutoMargin && shouldApplyAutoMargin());
+        childElements.subtitles = element;
     }
     if (controlsConfig.quality) {
         const { element, cleanup } = createQualitySelector(video, {

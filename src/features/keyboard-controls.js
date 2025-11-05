@@ -1,7 +1,8 @@
 import { TIMING } from '../constants/timing.js';
 
-export function setupKeyboardControls(video, hooks = {}, playerWrapper) {
+export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOptions = {}) {
     const VOLUME_STEP = 0.1;
+    const { cycleSubtitle } = extraOptions;
     
     function handleKeyDown(e) {
         // Only handle if video player area has focus or no input is focused
@@ -48,6 +49,13 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper) {
             case 'KeyM':
                 e.preventDefault();
                 toggleMute();
+                break;
+
+            case 'KeyC':
+                if (typeof cycleSubtitle === 'function') {
+                    e.preventDefault();
+                    cycleSubtitle();
+                }
                 break;
         }
     }

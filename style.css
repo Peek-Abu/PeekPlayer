@@ -587,13 +587,15 @@ button:focus {
 }
 
 /* Quality Selector Component */
-.quality-selector {
+.quality-selector,
+.subtitles-selector {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.quality-button {
+.quality-button,
+.subtitles-button {
   background: none;
   border: none;
   color: #fff;
@@ -606,16 +608,19 @@ button:focus {
   justify-content: center;
 }
 
-.quality-button:hover {
+.quality-button:hover,
+.subtitles-button:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.quality-icon {
+.quality-icon,
+.subtitles-icon {
   width: 20px;
   height: 20px;
 }
 
-.quality-menu {
+.quality-menu,
+.subtitles-menu {
   position: absolute;
   bottom: 100%;
   right: 50%;
@@ -631,7 +636,8 @@ button:focus {
   z-index: 1000;
 }
 
-.quality-option {
+.quality-option,
+.subtitles-option {
   display: block;
   width: 100%;
   background: none;
@@ -644,16 +650,19 @@ button:focus {
   transition: background-color 0.2s;
 }
 
-.quality-option:hover {
+.quality-option:hover,
+.subtitles-option:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.quality-option.selected {
+.quality-option.selected,
+.subtitles-option.selected {
   background: rgba(255, 255, 255, 0.2);
   color: #00ff88;
 }
 
-.quality-option.selected::after {
+.quality-option.selected::after,
+.subtitles-option.selected::after {
   content: ' ✓';
   float: right;
 }

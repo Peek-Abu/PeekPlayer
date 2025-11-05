@@ -13,7 +13,8 @@ let playerState = {
     duration: 0,
     volume: 1,
     muted: false,
-    error: null
+    error: null,
+    subtitle: 'Off'
 };
 
 // Settings from URL parameters
@@ -39,6 +40,46 @@ function sendMessage(type, data = {}) {
             type: `player:${type}`,
             data: { ...data, timestamp: Date.now() }
         }, '*');
+    }
+}
+
+function applySubtitleTracks(videoElement, tracks = []) {
+    if (!videoElement) {
+        return;
+    }
+
+    const existingTracks = videoElement.querySelectorAll('track[data-peekplayer="subtitle"]');
+    existingTracks.forEach((track) => track.remove());
+
+    tracks.forEach((trackData) => {
+        if (!trackData || !trackData.src) {
+            return;
+        }
+
+        const trackEl = document.createElement('track');
+        trackEl.setAttribute('data-peekplayer', 'subtitle');
+        trackEl.kind = trackData.kind || 'subtitles';
+        if (trackData.srclang || trackData.language) {
+            trackEl.srclang = trackData.srclang || trackData.language;
+        }
+        if (trackData.label) {
+            trackEl.label = trackData.label;
+        }
+        trackEl.src = trackData.src;
+        if (trackData.default) {
+            trackEl.default = true;
+        }
+
+        videoElement.appendChild(trackEl);
+    });
+
+    const textTracks = videoElement.textTracks;
+    if (textTracks && typeof textTracks === 'object') {
+        for (let i = 0; i < textTracks.length; i += 1) {
+            const track = textTracks[i];
+            if (!track) continue;
+            track.mode = track.default ? 'showing' : 'disabled';
+        }
     }
 }
 
@@ -78,14 +119,13 @@ function updatePlayerState() {
     if (!video) return;
 
     const newState = {
-        ready: playerState.ready,
+        ...playerState,
         playing: !video.paused,
         paused: video.paused,
         currentTime: video.currentTime || 0,
         duration: video.duration || 0,
         volume: video.volume,
-        muted: video.muted,
-        error: playerState.error
+        muted: video.muted
     };
 
     // Only send update if state changed
@@ -231,6 +271,8 @@ async function initializePeekPlayer() {
             video.poster = posterUrl;
         }
 
+        applySubtitleTracks(video, subtitleTracks);
+
         // Initialize HLS engine
         engine = new HLSWrapper(video);
         
@@ -267,6 +309,10 @@ async function initializePeekPlayer() {
             onQualityChange: (qualityLabel) => {
                 playerState.currentQuality = qualityLabel;
                 sendMessage('qualityChange', { ...playerState, quality: qualityLabel });
+            },
+            onSubtitleChange: (label) => {
+                playerState.subtitle = label;
+                sendMessage('subtitleChange', { ...playerState, subtitle: label });
             }
         };
 
@@ -288,6 +334,7 @@ async function initializePeekPlayer() {
             ...playerState,
             qualities: sources.map(s => s.displayName),
             subtitles: subtitleTracks.map(s => s.label),
+            subtitle: playerState.subtitle,
             hasMultipleQualities: sources.length > 1,
             hasMultipleSubtitles: subtitleTracks.length > 1,
             settings: playerSettings

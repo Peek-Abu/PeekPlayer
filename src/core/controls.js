@@ -175,6 +175,7 @@ export function setupOverlayControls(video, container, options = {}) {
         target.appendChild(element);
       }
     };
+    appendIfPresent(mobileTopRight, assignedElements.subtitles);
     appendIfPresent(mobileTopRight, assignedElements.quality);
     appendIfPresent(mobileTopLeft, assignedElements.pip);
     appendIfPresent(mobileTopRight, assignedElements.volume);
@@ -208,7 +209,9 @@ export function setupOverlayControls(video, container, options = {}) {
     
   // Setup interactions and behaviors
   const cleanupInteractions = setupVideoInteractions(video, resolvedWrapper, callbacks);
-  const cleanupKeyboard = setupKeyboardControls(video, callbacks, resolvedWrapper);
+  const cleanupKeyboard = setupKeyboardControls(video, callbacks, resolvedWrapper, {
+    cycleSubtitle: childElements.subtitles?.cycleSubtitle
+  });
   const cleanupAutoHide = setupAutoHideControls(video, [container, playPauseButton], resolvedWrapper);
   const cleanupMobileGestures = setupMobileGestures(video, resolvedWrapper, context.player);
   const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
