@@ -60,6 +60,14 @@ export function createSubtitleSelector(video, hooks = {}, logger, options = {}) 
   button.setAttribute('type', 'button');
   button.innerHTML = ICONS.SUBTITLES;
 
+  let ccActiveIndicatorMarkup = '';
+  const subtitlesIcon = button.querySelector('svg');
+  const activeIndicatorPath = subtitlesIcon?.querySelector('[data-role="cc-active-indicator"]');
+  if (activeIndicatorPath) {
+    ccActiveIndicatorMarkup = activeIndicatorPath.outerHTML;
+    activeIndicatorPath.remove();
+  }
+
   const menu = document.createElement('div');
   menu.className = 'subtitles-menu';
   menu.style.display = 'none';
@@ -82,8 +90,23 @@ export function createSubtitleSelector(video, hooks = {}, logger, options = {}) 
   function updateButtonState() {
     const activeOption = optionsList[currentIndex] || OFF_OPTION;
     const ariaLabel = activeOption.track ? `Closed captions: ${activeOption.label}` : 'Closed captions off';
+    const hasActiveTrack = !!activeOption.track;
     button.setAttribute('aria-label', ariaLabel);
-    button.classList.toggle('is-active', !!activeOption.track);
+    button.classList.toggle('is-active', hasActiveTrack);
+
+    const icon = button.querySelector('svg');
+    if (!icon) {
+      return;
+    }
+
+    const indicator = icon.querySelector('[data-role="cc-active-indicator"]');
+    if (hasActiveTrack) {
+      if (!indicator && ccActiveIndicatorMarkup) {
+        icon.insertAdjacentHTML('afterbegin', ccActiveIndicatorMarkup);
+      }
+    } else if (indicator) {
+      indicator.remove();
+    }
   }
 
   function updateVisibility() {
