@@ -253,7 +253,8 @@ export function setupOverlayControls(video, container, options = {}) {
   // Setup interactions and behaviors
   const cleanupInteractions = setupVideoInteractions(video, resolvedWrapper, callbacks);
   const cleanupKeyboard = setupKeyboardControls(video, callbacks, resolvedWrapper, {
-    cycleSubtitle: childElements.subtitles?.cycleSubtitle
+    cycleSubtitle: childElements.subtitles?.cycleSubtitle,
+    frameRate: options.frameRate
   });
   const cleanupAutoHide = setupAutoHideControls(video, [container, playPauseButton], resolvedWrapper, { isMobile });
   const cleanupMobileGestures = setupMobileGestures(video, resolvedWrapper, logger);

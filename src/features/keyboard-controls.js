@@ -74,7 +74,37 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
                     cycleSubtitle();
                 }
                 break;
+
+            case 'Comma':
+                e.preventDefault();
+                stepFrames(-1);
+                break;
+
+            case 'Period':
+                e.preventDefault();
+                stepFrames(1);
+                break;
         }
+    }
+
+    // Frame-by-frame stepping (, and .). Stepping implies paused inspection,
+    // so a playing video is paused first. The step size is one frame at the
+    // configured frame rate (default 30fps).
+    function stepFrames(count) {
+        if (!video.paused) {
+            video.pause();
+            if (hooks.onPlaybackChange) hooks.onPlaybackChange(false);
+        }
+        const frameSeconds = 1 / (extraOptions.frameRate || TIMING.DEFAULT_FRAME_RATE);
+        const duration = Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER;
+        const newTime = Math.min(duration, Math.max(0, video.currentTime + count * frameSeconds));
+        if (newTime === video.currentTime) {
+            return;
+        }
+        const delta = newTime - video.currentTime;
+        video.currentTime = newTime;
+        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        if (hooks.onSeek) hooks.onSeek(newTime, delta, percent);
     }
     
     function togglePlayPause() {

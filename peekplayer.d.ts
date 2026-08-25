@@ -99,6 +99,11 @@ export interface PeekPlayerOptions extends PlayerCallbacks {
   segments?: VideoSegment[];
   /** Auto-skip labeled segments such as intros */
   segmentAutoSkip?: SegmentAutoSkipConfig;
+  /**
+   * Source frame rate used for frame-by-frame stepping (`,` / `.` keys).
+   * Defaults to 30 when unknown.
+   */
+  frameRate?: number;
   /** Use the browser's native controls on touch devices */
   nativeControlsForMobile?: boolean;
   /** Toggle individual control components */

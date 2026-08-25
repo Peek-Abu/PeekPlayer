@@ -6,7 +6,7 @@ A professional HTML5 video player built from scratch with HLS support, custom co
 - **HLS Streaming** - M3U8 support with HLS.js v1.5.20
 - **Multi-Quality Selector** - Seamless quality switching
 - **Custom Controls** - Professional UI with tooltips
-- **Keyboard Shortcuts** - Spacebar, arrows, F, M
+- **Keyboard Shortcuts** - Spacebar, arrows, F, M, C, `,`/`.` (frame step)
 - **Mobile Friendly** - Touch gestures and responsive
 - **Auto Unmute** - Unmute on user interaction
 - **Auto Next** - Auto play next video in playlist

@@ -25,6 +25,9 @@ export const TIMING = {
   // Skip amounts (in seconds)
   SKIP_SECONDS: 10,
   
+  // Frame-by-frame stepping: assumed frame rate when the source fps is unknown
+  DEFAULT_FRAME_RATE: 30,
+  
   // Volume slider sensitivity
   VOLUME_PIXEL_TO_SECOND_RATIO: 10,
   
