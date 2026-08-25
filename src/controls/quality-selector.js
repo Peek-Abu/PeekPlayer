@@ -3,28 +3,17 @@ import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { assertVideoElement, assertExists, assertType, assertFunction, assert } from '../utils/assert.js';
 
-export function createQualitySelector(video, hooks = {}, logger) {
+export function createQualitySelector(video, hooks = {}, logger, options = {}) {
     const { player, onQualityChange } = hooks;
     // Assert required parameters
     assertVideoElement(video, { component: 'QualitySelector', method: 'createQualitySelector' });
     assertExists(player, 'player', { component: 'QualitySelector', method: 'createQualitySelector' });
     
-    // Handle case where sourcesData is not yet available (during initialization)
-    const sourcesData = player.sourcesData;
-    if (!sourcesData) {
-        logger.log('🎬 Quality selector: sourcesData not available yet, creating placeholder');
-        // Return a hidden placeholder that will be updated later
-        const container = document.createElement('div');
-        container.className = 'quality-selector';
-        container.style.display = 'none'; // Hide until sources are loaded
-        
-        return {
-            element: container,
-            cleanup: () => {}
-        };
-    }
     const container = document.createElement('div');
     container.className = 'quality-selector';
+    // Hidden until sources arrive; updateSources() will reveal it.
+    container.style.display = 'none';
+
     const button = document.createElement('button');
     button.className = 'quality-button';
     button.style.pointerEvents = 'auto';
@@ -37,20 +26,99 @@ export function createQualitySelector(video, hooks = {}, logger) {
     const menu = document.createElement('div');
     menu.className = 'quality-menu';
     menu.style.display = 'none';
+    menu.style.overflowY = 'auto';
     
     let isMenuOpen = false;
     let availableQualities = [];
     let currentQuality = 0; // Start with first quality
     let currentTime = 0;
     let wasPlaying = false;
-    
+
     // Update quality display
     function updateQualityDisplay() {
         const quality = availableQualities[currentQuality];
-        const qualityText = quality ? `${quality.height}p` : 'Auto';
+        const qualityText = getQualityLabel(quality);
         button.setAttribute('aria-label', `Quality: ${qualityText}`);
     }
-    
+
+    const getQualityLabel = (quality) => {
+        if (!quality) {
+            return 'Auto';
+        }
+        const baseLabel = typeof quality.displayName === 'string' && quality.displayName.trim().length
+            ? quality.displayName
+            : quality.height
+                ? `${quality.height}p`
+                : typeof quality.quality === 'string' && quality.quality.trim().length
+                    ? quality.quality
+                    : 'Auto';
+        return quality.isDub ? `${baseLabel} (Dub)` : baseLabel;
+    };
+
+    const findQualityIndex = (target) => {
+        if (!target) {
+            return -1;
+        }
+        return availableQualities.findIndex((candidate) => {
+            if (candidate.isAuto && target.isAuto) {
+                return true;
+            }
+            if (typeof candidate.hlsLevel === 'number' && typeof target.hlsLevel === 'number') {
+                return candidate.hlsLevel === target.hlsLevel;
+            }
+            if (candidate.url && target.url) {
+                return candidate.url === target.url;
+            }
+            if (typeof candidate.index === 'number' && typeof target.index === 'number') {
+                return candidate.index === target.index;
+            }
+            return false;
+        });
+    };
+
+    const updateAutoLabelFromSource = (activeSource) => {
+        const autoIndex = availableQualities.findIndex((quality) => quality.isAuto);
+        if (autoIndex === -1) {
+            return;
+        }
+
+        const autoQuality = availableQualities[autoIndex];
+        const activeLabel = getQualityLabel(activeSource);
+        autoQuality.displayName = `Auto (${activeLabel})`;
+        autoQuality.activeHeight = activeSource?.height || autoQuality.height;
+        if (autoQuality.activeHeight) {
+            autoQuality.height = autoQuality.activeHeight;
+        }
+
+        const options = menu.querySelectorAll('.quality-option');
+        const autoOptionNode = options[autoIndex];
+        if (autoOptionNode) {
+            autoOptionNode.textContent = autoQuality.displayName;
+        }
+    };
+
+    const setActiveQuality = (targetSource) => {
+        if (!targetSource) {
+            return;
+        }
+
+        if (!targetSource.isAuto) {
+            updateAutoLabelFromSource(targetSource);
+        }
+
+        let nextIndex = findQualityIndex(targetSource);
+        if (nextIndex === -1 && !targetSource.isAuto) {
+            updateAutoLabelFromSource(targetSource);
+            nextIndex = availableQualities.findIndex((quality) => quality.isAuto);
+        }
+
+        if (nextIndex !== -1) {
+            currentQuality = nextIndex;
+            updateQualityDisplay();
+            updateMenuSelection();
+        }
+    };
+
     // Build quality menu
     function buildQualityMenu(qualities) {
         assert(
@@ -74,16 +142,16 @@ export function createQualitySelector(video, hooks = {}, logger) {
         }
         
         logger.log('🎬 Building quality menu with:', qualities);
-        availableQualities = qualities;
+        availableQualities = qualities.map((quality) => ({ ...quality }));
         menu.innerHTML = '';
         
         // Add quality options
-        qualities.forEach((quality, index) => {
+        availableQualities.forEach((quality, index) => {
             const option = document.createElement('button');
             option.className = 'quality-option';
             
         // Use the pre-processed displayName
-        option.textContent = quality.displayName;
+            option.textContent = quality.displayName;
         
         option.onclick = () => selectQuality(index);
         menu.appendChild(option);
@@ -96,7 +164,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
     // Switch to different quality source
     const notifyQualityChange = (quality) => {
         if (!onQualityChange) return;
-        const label = quality.displayName || quality.quality || `${quality.height}p`;
+        const label = getQualityLabel(quality);
         onQualityChange(label);
     };
 
@@ -143,7 +211,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
         currentQuality = qualityIndex;
         
         // Show loading notification
-        showNotification(`Switching to ${newQuality.height}p...`, 'loading');
+        showNotification(`Switching to ${getQualityLabel(newQuality)}...`, 'loading');
         
         // Switch source
         if (player) {
@@ -158,7 +226,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
                 if (wasPlaying) {
                     video.play();
                 }
-                showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                showNotification(`Quality: ${getQualityLabel(newQuality)}`, 'success');
                 notifyQualityChange(newQuality);
             }).catch(error => {
                 logger.error('🎬 Quality switch failed:', error);
@@ -174,7 +242,7 @@ export function createQualitySelector(video, hooks = {}, logger) {
                 if (wasPlaying) {
                     video.play();
                 }
-                showNotification(`Quality: ${newQuality.height}p${newQuality.isDub ? ' (Dub)' : ''}`, 'success');
+                showNotification(`Quality: ${getQualityLabel(newQuality)}`, 'success');
                 notifyQualityChange(newQuality); // Added this line
             }, { once: true });
         }
@@ -184,16 +252,28 @@ export function createQualitySelector(video, hooks = {}, logger) {
         closeMenu();
     }
     
-    // Show notification
+    // Show notification (scoped to this player's wrapper so multiple
+    // player instances don't remove each other's notifications)
+    let spinKeyframesStyle = null;
+
+    function ensureSpinKeyframes() {
+        if (spinKeyframesStyle) {
+            return;
+        }
+        spinKeyframesStyle = document.createElement('style');
+        spinKeyframesStyle.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+        document.head.appendChild(spinKeyframesStyle);
+    }
+
     function showNotification(message, type = 'info') {
-        // Remove existing notifications
-        const existing = document.querySelectorAll('.quality-notification');
-        existing.forEach(n => n.remove());
+        const wrapper = getPlayerWrapper() || document.body;
+        // Remove existing notifications belonging to this player
+        wrapper.querySelectorAll(':scope > .quality-notification').forEach((n) => n.remove());
         
         const notification = document.createElement('div');
         notification.className = 'quality-notification';
         notification.style.cssText = `
-            position: fixed;
+            position: absolute;
             top: 20px;
             right: 20px;
             background: ${type === 'loading' ? 'rgba(255, 193, 7, 0.9)' : 
@@ -211,20 +291,16 @@ export function createQualitySelector(video, hooks = {}, logger) {
         `;
         
         if (type === 'loading') {
+            ensureSpinKeyframes();
             notification.innerHTML = `
                 <div style="width: 16px; height: 16px; border: 2px solid #fff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                 ${message}
             `;
-            
-            // Add spin animation
-            const style = document.createElement('style');
-            style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
-            document.head.appendChild(style);
         } else {
             notification.textContent = message;
         }
         
-        document.body.appendChild(notification);
+        wrapper.appendChild(notification);
         
         // Auto-remove after delay (longer for loading)
         const delay = type === 'loading' ? 5000 : 2000;
@@ -248,50 +324,106 @@ export function createQualitySelector(video, hooks = {}, logger) {
         });
     }
     
-    // Toggle menu
+    const getPlayerWrapper = () => {
+        if (hooks && hooks.playerWrapper instanceof HTMLElement) {
+            return hooks.playerWrapper;
+        }
+        if (player && player.playerWrapper instanceof HTMLElement) {
+            return player.playerWrapper;
+        }
+        const fallback = video.closest('.peekplayer-wrapper');
+        return fallback instanceof HTMLElement ? fallback : null;
+    };
+
+    const repositionMenu = () => {
+        if (!isMenuOpen) {
+            return;
+        }
+
+        menu.style.position = 'absolute';
+        menu.style.left = 'auto';
+        menu.style.right = '0';
+
+        const wrapper = getPlayerWrapper();
+        const buttonRect = button.getBoundingClientRect();
+        const wrapperRect = wrapper?.getBoundingClientRect();
+        const viewportHeight = typeof window !== 'undefined' ? (window.innerHeight || document.documentElement?.clientHeight || 0) : 0;
+
+        let spaceAbove = Number.POSITIVE_INFINITY;
+        let spaceBelow = Number.POSITIVE_INFINITY;
+
+        if (wrapperRect && buttonRect) {
+            spaceAbove = Math.max(0, buttonRect.top - wrapperRect.top - 8);
+            spaceBelow = Math.max(0, wrapperRect.bottom - buttonRect.bottom - 8);
+
+            const baseWidth = Math.max(120, Math.ceil(buttonRect.width + 40));
+            const maxAllowed = Math.min(320, Math.max(baseWidth, Math.floor(wrapperRect.width - 16)));
+            menu.style.minWidth = `${baseWidth}px`;
+            menu.style.maxWidth = `${maxAllowed}px`;
+            menu.style.width = 'auto';
+        } else {
+            menu.style.minWidth = '120px';
+            menu.style.maxWidth = '';
+            menu.style.width = 'auto';
+        }
+
+        const openedDownwards = spaceBelow > spaceAbove;
+        const availableSpace = openedDownwards ? spaceBelow : spaceAbove;
+        const viewportLimit = viewportHeight > 32 ? viewportHeight - 32 : viewportHeight;
+        const computedMaxHeight = Math.max(120, Math.min(Math.floor(availableSpace), viewportLimit || 320));
+        menu.style.maxHeight = `${computedMaxHeight}px`;
+
+        if (openedDownwards) {
+            menu.style.top = 'calc(100% + 8px)';
+            menu.style.bottom = 'auto';
+        } else {
+            menu.style.bottom = 'calc(100% + 8px)';
+            menu.style.top = 'auto';
+        }
+    };
+
     function toggleMenu() {
-        isMenuOpen = !isMenuOpen;
-        menu.style.display = isMenuOpen ? 'block' : 'none';
-        
-        if (isMenuOpen) {
-            const rect = button.getBoundingClientRect();
-            menu.style.position = 'absolute';
-            menu.style.bottom = '100%';
-            menu.style.right = '0';
-            menu.style.marginBottom = '8px';
+        const shouldOpen = !isMenuOpen;
+        if (shouldOpen) {
+            isMenuOpen = true;
+            menu.style.display = 'block';
+            repositionMenu();
+        } else {
+            closeMenu();
         }
     }
-    
+
     function closeMenu() {
         isMenuOpen = false;
         menu.style.display = 'none';
     }
     
     // Event listeners
-    button.onclick = (e) => {
+    const handleButtonClick = (e) => {
         e.stopPropagation();
         toggleMenu();
     };
-    
+    button.addEventListener('click', handleButtonClick);
+
     // Close menu when clicking outside
-    document.addEventListener('click', (e) => {
+    const handleDocumentClick = (e) => {
         if (!container.contains(e.target)) {
             closeMenu();
         }
-    });
+    };
+    document.addEventListener('click', handleDocumentClick);
+
+    const onWindowResize = () => repositionMenu();
+    if (typeof window !== 'undefined') {
+        window.addEventListener('resize', onWindowResize);
+    }
     
-    // Initialize with sources data
-    if (sourcesData && sourcesData.sources) {
-        buildQualityMenu(sourcesData.sources);
+    // Initialize with sources data if already available
+    const initialSourcesData = player.sourcesData;
+    if (initialSourcesData?.sources?.length) {
+        buildQualityMenu(initialSourcesData.sources);
     } else {
-        // Fallback for demo
-        logger.log('🎬 No sources provided, using demo qualities');
-        const demoQualities = [
-            { height: 1080, width: 1920, url: '', label: '1080p', isDub: false, index: 0 },
-            { height: 720, width: 1280, url: '', label: '720p', isDub: false, index: 1 },
-            { height: 480, width: 854, url: '', label: '480p', isDub: false, index: 2 }
-        ];
-        buildQualityMenu(demoQualities);
+        logger.log('🎬 Quality selector: no sources available yet, waiting for updateSources()');
     }
     // Assemble component
     container.appendChild(button);
@@ -302,26 +434,34 @@ export function createQualitySelector(video, hooks = {}, logger) {
         ...TOOLTIP_CONFIG.DYNAMIC_FAST,
         getContent: () => {
             const quality = availableQualities[currentQuality];
-            const qualityText = quality ? `${quality.height}p${quality.isDub ? ' (Dub)' : ''}` : 'Quality';
+            const qualityText = getQualityLabel(quality);
             return qualityText;
-        }
+        },
+        isMobile: options.isMobile
     });
     
     updateQualityDisplay();
     
     // Return container and update method for external source changes
     container.updateSources = (newSourcesData) => {
-        if (newSourcesData && newSourcesData.sources) {
+        if (newSourcesData && Array.isArray(newSourcesData.sources) && newSourcesData.sources.length) {
             buildQualityMenu(newSourcesData.sources);
             currentQuality = 0; // Reset to first quality
             updateQualityDisplay();
-            notifyQualityChange(newSourcesData.sources[0]);
         }
     };
-    
-    return { element: container, cleanup: () => {
+    container.setActiveQuality = setActiveQuality;
+
+    return { element: container, setActiveQuality, cleanup: () => {
         cleanupTooltip();
-        button.removeEventListener('click', toggleMenu);
-        menu.removeEventListener('click', closeMenu);
+        if (typeof window !== 'undefined') {
+            window.removeEventListener('resize', onWindowResize);
+        }
+        button.removeEventListener('click', handleButtonClick);
+        document.removeEventListener('click', handleDocumentClick);
+        if (spinKeyframesStyle && spinKeyframesStyle.parentNode) {
+            spinKeyframesStyle.parentNode.removeChild(spinKeyframesStyle);
+            spinKeyframesStyle = null;
+        }
     }};
 }

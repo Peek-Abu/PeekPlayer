@@ -6,7 +6,7 @@ A professional HTML5 video player built from scratch with HLS support, custom co
 - **HLS Streaming** - M3U8 support with HLS.js v1.5.20
 - **Multi-Quality Selector** - Seamless quality switching
 - **Custom Controls** - Professional UI with tooltips
-- **Keyboard Shortcuts** - Spacebar, arrows, F, M
+- **Keyboard Shortcuts** - Spacebar, arrows, F, M, C, `,`/`.` (frame step)
 - **Mobile Friendly** - Touch gestures and responsive
 - **Auto Unmute** - Unmute on user interaction
 - **Auto Next** - Auto play next video in playlist
@@ -22,27 +22,32 @@ npm install @peekabu/peekplayer
 ## Usage
 
 ```html
-<link rel="stylesheet" href="node_modules/@peekabu/peekplayer/style.css">
+<link rel="stylesheet" href="node_modules/@peekabu/peekplayer/dist/peekplayer.css">
 
-<div id="player-wrapper">
-    <video id="peek-video" preload="auto" crossorigin=""></video>
-    <div id="custom-controls"></div>
-    <div id="overlay-container"></div>
+<div class="peekplayer-example">
+    <video class="peekplayer-example__video" preload="auto" crossorigin=""></video>
+    <div class="peekplayer-example__controls"></div>
+    <div class="peekplayer-example__overlay"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
 <script src="node_modules/@peekabu/peekplayer/dist/peekplayer.js"></script>
+<!-- hls.js is bundled inside peekplayer.js — no separate hls.js script tag needed -->
 
 <script>
+const wrapper = document.querySelector('.peekplayer-example');
+
 const player = new PeekPlayer({
-    videoElement: document.getElementById('peek-video'),
-    controlsContainer: document.getElementById('custom-controls'),
-    overlayContainer: document.getElementById('overlay-container')
+    videoElement: wrapper.querySelector('video'),
+    controlsContainer: wrapper.querySelector('.peekplayer-example__controls'),
+    overlayContainer: wrapper.querySelector('.peekplayer-example__overlay'),
+    playerWrapper: wrapper
 });
 
 player.loadSource('https://example.com/video.m3u8');
 </script>
 ```
+
+The `playerWrapper` option is optional; when omitted, PeekPlayer will resolve it from the supplied elements. Using direct element references keeps the markup flexible without relying on IDs.
 
 ## Multi-Quality Sources
 
@@ -96,13 +101,17 @@ npm run dev      # Development with watch
 npm run serve    # Local server
 ```
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release notes (Keep a Changelog format).
+
 ## Issue Tracking
 
 <p align="center">
-  <img src="docs/assets/Highfly-white-name.svg" alt="Highfly logo" height="60" />
+  <img src="docs/assets/Highfly.svg" alt="Highfly logo" height="60" />
 </p>
 
-PeekPlayer tracks bugs and feature requests in [Highfly](https://highfly.app). The issue board lives in the PeekPlayer workspace, where feature requests are tagged by release milestone and bugs receive severity labels.
+PeekPlayer tracks bugs and feature requests in [HighFly](https://highfly.app). The issue board lives in the PeekPlayer workspace, where feature requests are tagged by release milestone and bugs receive severity labels.
 
 
 ## 📄 License

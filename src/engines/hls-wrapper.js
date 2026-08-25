@@ -90,10 +90,41 @@ export class HLSWrapper {
         }
       });
 
+      this.hls.on(Hls.Events.LEVEL_SWITCHED, (_event, data) => {
+        const levelIndex = typeof data?.level === 'number' ? data.level : this.hls?.currentLevel;
+        if (typeof levelIndex !== 'number' || levelIndex < 0) {
+          return;
+        }
+
+        const sources = this.sourcesData?.sources || [];
+        const matchingSource = sources.find((source) =>
+          typeof source.hlsLevel === 'number' ? source.hlsLevel === levelIndex : source.index === levelIndex
+        ) || sources[levelIndex];
+
+        this.video.dispatchEvent(new CustomEvent('peekplayer:hls-level-switch', {
+          detail: {
+            levelIndex,
+            source: matchingSource || null
+          }
+        }));
+      });
+
       this.hls.on(Hls.Events.ERROR, (event, data) => {
         this.logger.error('🎬 HLS Error:', data);
       });
-
+      this.hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_evt, data) => {
+        this.logger.log('🎬 Subtitle tracks updated:', data);
+        const tracks = data.subtitleTracks || [];
+        this.video.dispatchEvent(new CustomEvent('peekplayer:subtitle-tracks', {
+          detail: tracks.map(({ name, lang, url, default: isDefault }, index) => ({
+            id: index,
+            label: name || lang?.toUpperCase() || `Track ${index + 1}`,
+            language: lang,
+            src: url,
+            default: !!isDefault
+          }))
+        }));
+      });
       return this;
     }
 

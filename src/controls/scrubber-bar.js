@@ -25,6 +25,9 @@ export function createScrubberBar(video, onSeek, options = {}) {
             video.currentTime = time;
             if (onSeek) onSeek(time, delta, percent);
         },
+        onScrubPreview: typeof options.onScrubPreview === 'function' ? options.onScrubPreview : null,
+        onScrubStart: typeof options.onScrubStart === 'function' ? options.onScrubStart : null,
+        onScrubEnd: typeof options.onScrubEnd === 'function' ? options.onScrubEnd : null,
         segmentGap,
         ...(segmentHooks ? { segmentHooks } : {})
     });
@@ -72,8 +75,9 @@ export function createScrubberBar(video, onSeek, options = {}) {
     updateScrubber();
 
     const cleanupTooltip = createScrubberTooltip(interactiveElement, video, {
-        getSegments
-    });
+        getSegments,
+        isMobile: options.isMobile
+    },);
 
     // Use requestAnimationFrame for smooth updates
     let animationFrame;

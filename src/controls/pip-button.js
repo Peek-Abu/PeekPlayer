@@ -2,18 +2,18 @@ import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 
-export function createPipButton(video, onPipChange, logger) {
+export function createPipButton(video, onPipChange, logger, options = {}) {
     const button = document.createElement('button');
     button.className = 'pip-button';
     button.style.pointerEvents = 'auto';
 
-    
     // Check if PiP is supported
     const isPipSupported = 'pictureInPictureEnabled' in document && document.pictureInPictureEnabled;
-    
     if (!isPipSupported) {
+        logger?.warn?.('PiP is not supported');
         button.style.display = 'none';
-        return button;
+        // Keep the standard return shape so callers can destructure safely.
+        return { element: button, cleanup: () => {} };
     }
     
     // Update button icon and label based on PiP state
@@ -41,32 +41,34 @@ export function createPipButton(video, onPipChange, logger) {
                 await video.requestPictureInPicture();
             }
         } catch (error) {
-            logger.warn('PiP operation failed:', error);
-            // Could show a toast notification here
+            logger?.warn?.('PiP operation failed:', error);
         }
     }
-    
-    // Event listeners
-    button.addEventListener('click', (e) => {
+
+    const handleButtonClick = (e) => {
         e.stopPropagation();
         togglePip();
-    });
-    
-    // Listen for PiP state changes
-    video.addEventListener('enterpictureinpicture', () => {
+    };
+
+    const handleEnterPip = () => {
         updatePipButton();
         if (onPipChange) onPipChange(true);
-    });
-    
-    video.addEventListener('leavepictureinpicture', () => {
+    };
+
+    const handleLeavePip = () => {
         updatePipButton();
         if (onPipChange) onPipChange(false);
-    });
+    };
+
+    const handleLoadedMetadata = () => {
+        button.style.display = 'flex';
+    };
     
-    // Handle when PiP is not available (e.g., video not loaded)
-    video.addEventListener('loadedmetadata', () => {
-        button.style.display = 'flex'; // Changed from conditional to always show
-    });
+    // Event listeners (named handlers so cleanup can actually remove them)
+    button.addEventListener('click', handleButtonClick);
+    video.addEventListener('enterpictureinpicture', handleEnterPip);
+    video.addEventListener('leavepictureinpicture', handleLeavePip);
+    video.addEventListener('loadedmetadata', handleLoadedMetadata);
     
     // Initial state
     updatePipButton();
@@ -76,13 +78,14 @@ export function createPipButton(video, onPipChange, logger) {
         getContent: () => {
             const isInPip = document.pictureInPictureElement === video;
             return isInPip ? 'Exit Picture in Picture' : 'Picture in Picture';
-        }
+        },
+        isMobile: options.isMobile
     });
     return { element: button, cleanup: () => {
         cleanupTooltip();
-        button.removeEventListener('click', togglePip);
-        video.removeEventListener('enterpictureinpicture', updatePipButton);
-        video.removeEventListener('leavepictureinpicture', updatePipButton);
-        video.removeEventListener('loadedmetadata', () => { button.style.display = 'flex'; });
+        button.removeEventListener('click', handleButtonClick);
+        video.removeEventListener('enterpictureinpicture', handleEnterPip);
+        video.removeEventListener('leavepictureinpicture', handleLeavePip);
+        video.removeEventListener('loadedmetadata', handleLoadedMetadata);
     }};
 }

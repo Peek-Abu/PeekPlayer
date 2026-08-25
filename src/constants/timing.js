@@ -20,9 +20,13 @@ export const TIMING = {
   DOUBLE_TAP_THRESHOLD: 500,
   SWIPE_THRESHOLD: 50,
   SWIPE_VERTICAL_LIMIT: 100,
+  SWIPE_PIXEL_TO_SECOND_RATIO: 10,
   
   // Skip amounts (in seconds)
   SKIP_SECONDS: 10,
+  
+  // Frame-by-frame stepping: assumed frame rate when the source fps is unknown
+  DEFAULT_FRAME_RATE: 30,
   
   // Volume slider sensitivity
   VOLUME_PIXEL_TO_SECOND_RATIO: 10,

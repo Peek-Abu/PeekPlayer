@@ -1,4 +1,7 @@
-export function createTimeDisplay(video, onTimeUpdate) {
+export function createTimeDisplay(video) {
+    // While a scrub drag is active, timeupdate/seeked events carry the stale
+    // playback position and must not overwrite the previewed position.
+    let scrubbing = false;
     const timeContainer = document.createElement('div');
     timeContainer.className = 'time-display';
     timeContainer.style.pointerEvents = 'auto';
@@ -36,30 +39,51 @@ export function createTimeDisplay(video, onTimeUpdate) {
     
     // Update time display
     function updateTimeDisplay() {
+        if (scrubbing) {
+            return;
+        }
         const currentTime = video.currentTime || 0;
         const duration = video.duration || 0;
         
         currentTimeSpan.textContent = formatTime(currentTime);
         totalTimeSpan.textContent = formatTime(duration);
-        
-        // Call optional callback for external updates
-        if (onTimeUpdate) {
-            onTimeUpdate(currentTime, duration);
-        }
     }
     
     // Set up event listeners for time updates
     video.addEventListener('timeupdate', updateTimeDisplay);
     video.addEventListener('loadedmetadata', updateTimeDisplay);
     video.addEventListener('durationchange', updateTimeDisplay);
+    video.addEventListener('seeked', handleSeeked);
     
     // Initial update
     updateTimeDisplay();
+
+    // Live preview while the scrubber is being dragged (before the seek is
+    // committed to the video element).
+    function setCurrentTime(seconds) {
+        currentTimeSpan.textContent = formatTime(Number.isFinite(seconds) ? seconds : 0);
+    }
+    timeContainer.setCurrentTime = setCurrentTime;
+
+    // Toggled by the scrubber so stale timeupdate/seeked events during a
+    // drag don't overwrite the previewed time.
+    function setScrubbing(active) {
+        scrubbing = !!active;
+        if (!scrubbing) {
+            updateTimeDisplay();
+        }
+    }
+    timeContainer.setScrubbing = setScrubbing;
+
+    function handleSeeked() {
+        updateTimeDisplay();
+    }
 
     return { element: timeContainer, cleanup: () => {
         video.removeEventListener('timeupdate', updateTimeDisplay);
         video.removeEventListener('loadedmetadata', updateTimeDisplay);
         video.removeEventListener('durationchange', updateTimeDisplay);
+        video.removeEventListener('seeked', handleSeeked);
         timeContainer.remove();
     }};
 }

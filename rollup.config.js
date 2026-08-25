@@ -27,8 +27,18 @@ const copyAssets = () => ({
 export default {
   input: 'src/core/player.js',
   output: [
+    // UMD for <script> tags (kept as .js so examples/CDN usage keeps working)
     {
       file: 'dist/peekplayer.js',
+      format: 'umd',
+      name: 'PeekPlayer',
+      exports: 'named'
+    },
+    // CJS for Node require(). Must be .cjs because the package is
+    // `"type": "module"` — a .js UMD file would be parsed as ESM and
+    // `require()` would return an empty namespace.
+    {
+      file: 'dist/peekplayer.cjs',
       format: 'umd',
       name: 'PeekPlayer',
       exports: 'named'

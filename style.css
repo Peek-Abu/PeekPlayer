@@ -6,14 +6,14 @@ body {
   justify-content: center;
 }
 
-#player-wrapper {
+.peekplayer-wrapper {
   position: relative;
   width: 100%;
   background: #222;
   border-radius: 8px;
   box-shadow: 0 2px 12px #000a;
-  aspect-ratio: 16 / 9;  /* ✅ Maintains video ratio */
-  overflow: hidden;       /* ✅ Prevents control overflow */
+  aspect-ratio: 16 / 9;  /* Maintains video ratio */
+  overflow: hidden;       /* Prevents control overflow */
 }
 
 video {
@@ -31,7 +31,6 @@ video {
   position: relative;
   padding: 4px 0; /* Add padding for easier hover target */
 }
-
 
 .scrubber {
   flex: 1;
@@ -145,7 +144,7 @@ video {
   padding: 6px 4px;
 }
 
-#custom-controls {
+.peekplayer-controls {
   position: absolute;
   bottom: 0;
   left: 0;
@@ -153,6 +152,71 @@ video {
   width: 100%;
   box-sizing: border-box;
   z-index: 5;
+}
+
+.peekplayer-controls.mobile {
+  top: 0;
+  bottom: 0;
+  display: block;
+  padding: 0;
+  pointer-events: none; 
+}
+
+.peekplayer-controls.mobile .scrubber-row {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  padding: 0 12px 24px;
+  align-items: flex-end;
+}
+
+.controls-mobile {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 0px 8px 16px;
+  z-index: 6;
+  pointer-events: none;
+}
+
+.controls-mobile__top,
+.controls-mobile__bottom {
+  pointer-events: auto;
+}
+
+.controls-mobile__top,
+.controls-mobile__bottom {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+}
+
+.controls-mobile__top {
+  margin-bottom: auto;
+}
+
+.controls-mobile__bottom {
+  align-items: flex-end;
+  padding-bottom: 8px;
+}
+
+.controls-mobile__top-left,
+.controls-mobile__top-right,
+.controls-mobile__bottom-left,
+.controls-mobile__bottom-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  pointer-events: auto;
+}
+
+.controls-mobile button,
+.controls-mobile .time-display {
+  min-height: 44px;
 }
 
 /* Time Display Component */
@@ -298,7 +362,7 @@ button:focus {
 }
 
 /* Paused Overlay with Vignette Effect */
-#overlay-container {
+.peekplayer-overlay {
   position: absolute;
   top: 0;
   left: 0;
@@ -313,7 +377,7 @@ button:focus {
   z-index: 10;
 }
 
-#overlay-container.visible {
+.peekplayer-overlay.visible {
   opacity: 1;
   pointer-events: auto;
 }
@@ -523,13 +587,15 @@ button:focus {
 }
 
 /* Quality Selector Component */
-.quality-selector {
+.quality-selector,
+.subtitles-selector {
   position: relative;
   display: flex;
   align-items: center;
 }
 
-.quality-button {
+.quality-button,
+.subtitles-button {
   background: none;
   border: none;
   color: #fff;
@@ -542,30 +608,36 @@ button:focus {
   justify-content: center;
 }
 
-.quality-button:hover {
+.quality-button:hover,
+.subtitles-button:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.quality-icon {
+.quality-icon,
+.subtitles-icon {
   width: 20px;
   height: 20px;
 }
 
-.quality-menu {
+.quality-menu,
+.subtitles-menu {
   position: absolute;
   bottom: 100%;
-  right: 50%; 
+  right: 50%;
   transform: translateX(50%);
   margin-bottom: 8px;
   background: rgba(0, 0, 0, 0.9);
   border-radius: 6px;
   padding: 4px 0;
-  min-width: 80px;
+  min-width: 120px;
+  max-height: 50vh;
+  overflow-y: auto;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
   z-index: 1000;
 }
 
-.quality-option {
+.quality-option,
+.subtitles-option {
   display: block;
   width: 100%;
   background: none;
@@ -578,16 +650,19 @@ button:focus {
   transition: background-color 0.2s;
 }
 
-.quality-option:hover {
+.quality-option:hover,
+.subtitles-option:hover {
   background: rgba(255, 255, 255, 0.1);
 }
 
-.quality-option.selected {
+.quality-option.selected,
+.subtitles-option.selected {
   background: rgba(255, 255, 255, 0.2);
   color: #00ff88;
 }
 
-.quality-option.selected::after {
+.quality-option.selected::after,
+.subtitles-option.selected::after {
   content: ' ✓';
   float: right;
 }
@@ -600,14 +675,10 @@ button:focus {
     align-items: center;
     padding: 8px 12px;
   }
-  
-  /* Hide non-essential controls on mobile */
-  .skip-button,
-  .pip-button,
-  .volume-control {
-    display: none !important;
+  .paused-play-button {
+    width: 40px;
+    height: 40px;
   }
-  
   /* Essential mobile controls order: Play | Scrubber | Time | Fullscreen */
   .play-toggle-button { order: 1; }
   .scrubber-row { order: 2; flex: 1; }
@@ -632,4 +703,15 @@ button:focus {
     height: 16px;
     margin-top: -6px;
   }
+}
+/* Mobile swipe seek indicator */
+@keyframes peekplayer-fade-in-out {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
+
+.seek-indicator {
+  will-change: opacity, transform;
 }

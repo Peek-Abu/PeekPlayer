@@ -7,10 +7,10 @@
     <link rel="stylesheet" href="../dist/peekplayer.css">
 </head>
 <body>
-    <div id="player-wrapper">
-        <video id="peek-video" playsinline webkit-playsinline preload="auto" crossorigin=""></video>
-        <div id="custom-controls"></div>
-        <div id="overlay-container"></div>
+    <div class="peekplayer-wrapper">
+        <video class="peekplayer-video" playsinline webkit-playsinline preload="auto" crossorigin=""></video>
+        <div class="peekplayer-controls"></div>
+        <div class="peekplayer-overlay"></div>
     </div>
     
     <!-- Load dependencies -->
@@ -20,15 +20,17 @@
     
     <script>
         document.addEventListener('DOMContentLoaded', async () => {
-            const video = document.getElementById('peek-video');
-            const controlsContainer = document.getElementById('custom-controls');
-            const overlayContainer = document.getElementById('overlay-container');
+            const wrapper = document.querySelector('.peekplayer-wrapper');
+            const video = wrapper?.querySelector('.peekplayer-video');
+            const controlsContainer = wrapper?.querySelector('.peekplayer-controls');
+            const overlayContainer = wrapper?.querySelector('.peekplayer-overlay');
             
             // Create PeekPlayer instance (available as global PeekPlayer)
             const player = new PeekPlayer.PeekPlayer({
                 videoElement: video,
                 controlsContainer: controlsContainer,
-                overlayContainer: overlayContainer
+                overlayContainer: overlayContainer,
+                playerWrapper: wrapper
             });
             
             // Load a sample video

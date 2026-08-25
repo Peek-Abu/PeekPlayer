@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>PeekPlayer test fixture</title>
+  <link rel="stylesheet" href="../../dist/peekplayer.css">
+  <style>
+    body { background: #111; margin: 0; padding: 20px; }
+    .pw { position: relative; width: 640px; height: 360px; background: #000; }
+  </style>
+</head>
+<body>
+<div id="wrapper" class="pw">
+  <video id="video" playsinline></video>
+  <div id="controls"></div>
+</div>
+<script type="module">
+  import PeekPlayer from '../../dist/peekplayer.esm.js';
+  window.__events = [];
+  window.player = new PeekPlayer({
+    videoElement: document.getElementById('video'),
+    controlsContainer: document.getElementById('controls'),
+    playerWrapper: document.getElementById('wrapper'),
+    onPlaybackChange: (p) => window.__events.push(['playback', p]),
+    onSeek: (t) => window.__events.push(['seek', t]),
+    onVolumeChange: (v) => window.__events.push(['volume', v]),
+  });
+  window.player.loadSource('./sample.mp4');
+</script>
+</body>
+</html>

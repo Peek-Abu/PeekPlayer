@@ -1,7 +1,7 @@
 // PeekPlayer - Modular HTML5 Video Player
 import { setupOverlayControls } from './controls.js';
 import { HLSWrapper } from '../engines/hls-wrapper.js';
-import { assert, assertExists, assertVideoElement, assertType } from '../utils/assert.js';
+import { assert, assertElement, assertExists, assertVideoElement, assertType } from '../utils/assert.js';
 
 const DEFAULT_LOGGER = {
   debugEnabled: false,
@@ -51,19 +51,32 @@ function normalizeSegments(segments = []) {
 }
 
 // Engine selection logic
-function selectVideoEngine(options = {}, sources = [], logger = DEFAULT_LOGGER) {
+function selectVideoEngine(options = {}, sources = [], logger = DEFAULT_LOGGER, url = '') {
   if (options.engine) return options.engine;
   
-  const forceHLS = new URLSearchParams(window.location.search).get('engine') === 'hls';
+  const forceHLS = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('engine') === 'hls';
   
   if (forceHLS) return 'hls';
   
-  // Auto-detect based on source URLs
-  if (sources.length > 0) {
-    const firstUrl = sources[0].url.toLowerCase();
-    if (firstUrl.includes('.m3u8') || firstUrl.includes('hls')) {
+  // Auto-detect based on the direct URL and source URLs
+  const candidateUrls = [];
+  if (typeof url === 'string' && url) {
+    candidateUrls.push(url);
+  }
+  if (sources.length > 0 && typeof sources[0]?.url === 'string') {
+    candidateUrls.push(sources[0].url);
+  }
+  
+  for (const candidateUrl of candidateUrls) {
+    const lowerUrl = candidateUrl.toLowerCase();
+    if (lowerUrl.includes('.m3u8') || lowerUrl.includes('hls')) {
       return 'hls';
     }
+  }
+  
+  if (sources.length > 0) {
+    const firstUrl = (sources[0].url || '').toLowerCase();
     if (firstUrl.includes('.mp4') || firstUrl.includes('.webm') || firstUrl.includes('.ogg')) {
       return 'native';
     }
@@ -78,7 +91,7 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
   assertExists(url, 'url', { component: 'Player', method: 'initializeVideoEngine' });
   assertType(url, 'string', 'url', { component: 'Player', method: 'initializeVideoEngine' });
   
-  const engineType = selectVideoEngine(options, sources, logger);
+  const engineType = selectVideoEngine(options, sources, logger, url);
   logger.log(`🎬 Selected engine: ${engineType}`);
   
   let engine;
@@ -116,25 +129,155 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
   return engine;
 }
 
+function extractHeightFromString(value) {
+  if (!value) return null;
+  const stringValue = String(value);
+  const numericMatch = stringValue.match(/(\d{3,4})\s*(?:p\b|$)/i);
+  if (numericMatch) {
+    const parsed = parseInt(numericMatch[1], 10);
+    if (Number.isFinite(parsed)) {
+      return parsed;
+    }
+  }
+  if (/8k/i.test(stringValue)) return 4320;
+  if (/4k/i.test(stringValue)) return 2160;
+  if (/2k/i.test(stringValue)) return 1440;
+  return null;
+}
+
+function extractHeightFromSource(source) {
+  if (source && Number.isFinite(source.height)) {
+    return source.height;
+  }
+  const candidates = [source?.quality, source?.displayName, source?.label];
+  for (const candidate of candidates) {
+    const height = extractHeightFromString(candidate);
+    if (height) {
+      return height;
+    }
+  }
+  if (source && Number.isFinite(source.bandwidth)) {
+    const estimated = Math.round(Math.sqrt(source.bandwidth));
+    if (Number.isFinite(estimated) && estimated >= 144) {
+      return estimated;
+    }
+  }
+  return null;
+}
+
+function formatHeightLabel(height) {
+  if (!height) {
+    return 'Auto';
+  }
+  let suffix = '';
+  if (height >= 4320) {
+    suffix = ' 8K';
+  } else if (height >= 2160) {
+    suffix = ' 4K';
+  } else if (height >= 1440) {
+    suffix = ' QHD';
+  } else if (height >= 1080) {
+    suffix = ' Full HD';
+  } else if (height >= 720) {
+    suffix = ' HD';
+  }
+  return `${height}p${suffix}`;
+}
+
+function buildQualityDisplayName(source, height) {
+  const rawCandidates = [source?.displayName, source?.label, source?.quality];
+  const raw = rawCandidates.find((candidate) => typeof candidate === 'string' && candidate.trim().length > 0);
+  const lowerRaw = raw?.toLowerCase() || '';
+  if (lowerRaw.includes('auto')) {
+    return 'Auto';
+  }
+  if (!raw) {
+    return formatHeightLabel(height);
+  }
+  const trimmed = raw.trim();
+  if (/^\d+$/.test(trimmed)) {
+    return formatHeightLabel(parseInt(trimmed, 10));
+  }
+  if (/^\d+\s*p$/i.test(trimmed)) {
+    return formatHeightLabel(parseInt(trimmed, 10));
+  }
+  if (/^\d+\s*k$/i.test(trimmed)) {
+    if (height) {
+      return formatHeightLabel(height);
+    }
+    const value = parseInt(trimmed, 10);
+    if (Number.isFinite(value)) {
+      if (value >= 8) return formatHeightLabel(4320);
+      if (value >= 4) return formatHeightLabel(2160);
+      if (value >= 2) return formatHeightLabel(1440);
+    }
+  }
+  if (height && /^\d{3,4}$/i.test(trimmed.replace(/[^\d]/g, ''))) {
+    return formatHeightLabel(height);
+  }
+  return trimmed;
+}
+
+function isAutoQualityLabel(label) {
+  return typeof label === 'string' && label.trim().toLowerCase() === 'auto';
+}
+
+function getQualitySortWeight(source) {
+  if (isAutoQualityLabel(source.displayName)) {
+    return Number.POSITIVE_INFINITY;
+  }
+  return source.height || 0;
+}
+
 function processVideoSources(sourcesData) {
   if (!sourcesData?.sources?.length) return null;
-  
-  const processedSources = sourcesData.sources
-      .filter(source => source.url && source.quality)
-      .map((source, index) => {
-          const qualityMatch = source.quality.match(/(\d+)p/);
-          const height = qualityMatch ? parseInt(qualityMatch[1]) : 480;
-          
-          return {
-              ...source,
-              height,
-              width: Math.round(height * 16/9),
-              index,
-              displayName: source.quality
-          };
-      })
-      .sort((a, b) => b.height - a.height); // Sort by quality (highest first)
-  
+
+  let processedSources = sourcesData.sources
+    .filter((source) => source?.url && (source.quality || source.displayName || source.label))
+    .map((source, index) => {
+      const height = extractHeightFromSource(source) || 0;
+      const displayName = buildQualityDisplayName(source, height);
+      return {
+        ...source,
+        height,
+        width: height ? Math.round((height * 16) / 9) : undefined,
+        index,
+        displayName,
+      };
+    })
+    .sort((a, b) => {
+      const weightA = getQualitySortWeight(a);
+      const weightB = getQualitySortWeight(b);
+      if (weightA === weightB) {
+        return a.index - b.index;
+      }
+      return weightB - weightA;
+    });
+
+  if (processedSources.length > 1 && !processedSources.some((source) => isAutoQualityLabel(source.displayName))) {
+    const estimatedHeight = processedSources.reduce((best, source) => {
+      if (!source.height) {
+        return best;
+      }
+      if (!best) {
+        return source.height;
+      }
+      return Math.min(best, source.height);
+    }, 0);
+
+    const autoSource = {
+      url: processedSources[0].url,
+      quality: 'Auto',
+      displayName: 'Auto',
+      height: estimatedHeight || undefined,
+      width: estimatedHeight ? Math.round((estimatedHeight * 16) / 9) : undefined,
+      index: -1,
+      isAuto: true,
+    };
+
+    processedSources = [autoSource, ...processedSources];
+  }
+
   return { ...sourcesData, sources: processedSources };
 }
 
@@ -147,6 +290,7 @@ export class PeekPlayer {
       videoElement,
       controlsContainer,
       overlayContainer,
+      playerWrapper,
       engine,
       hlsConfig,
       autoplay = false,
@@ -161,14 +305,32 @@ export class PeekPlayer {
     // Validate required elements
     assertVideoElement(videoElement, { component: 'PeekPlayer', method: 'constructor' });
     assertExists(controlsContainer, 'controlsContainer', { component: 'PeekPlayer', method: 'constructor' });
+    const resolvedWrapper = playerWrapper
+      || controlsContainer?.closest('.peekplayer-wrapper')
+      || videoElement.closest('.peekplayer-wrapper')
+      || controlsContainer?.parentElement
+      || videoElement.parentElement;
+    assertElement(resolvedWrapper, 'playerWrapper', {
+      component: 'PeekPlayer',
+      method: 'constructor',
+      note: 'Provide `playerWrapper` when instantiating PeekPlayer.'
+    });
     
     this.video = videoElement;
     this.controlsContainer = controlsContainer;
     this.overlayContainer = overlayContainer;
+    this.playerWrapper = resolvedWrapper;
+    this.playerWrapper.classList.add('peekplayer-wrapper');
+    this.controlsContainer.classList.add('peekplayer-controls');
+    if (this.overlayContainer) {
+      this.overlayContainer.classList.add('peekplayer-overlay');
+    }
     this.engine = null;
     this.sourcesData = null;
     this.controlsInitialized = false;
     this.controlsCleanup = null;
+    this._initControlsTimeout = null;
+    this._isDestroyed = false;
     this.options = {
       ...options,
       engine,
@@ -191,7 +353,7 @@ export class PeekPlayer {
     this.autoNext = !!autoNext;
     this.options.controls = { ...(options.controls || {}) };
     this.options.segments = normalizedSegments;
-    this.logger.log('🎬 PeekPlayer initialized with options:', {
+    this.logger.log('PeekPlayer initialized with options:', {
       autoplay: this.autoplay,
       autoNext: this.autoNext,
       poster: !!poster,
@@ -211,19 +373,43 @@ export class PeekPlayer {
     this.autoUnmuteOnInteraction = !!autoUnmuteOnInteraction;
     this._handleVideoEnd = this._handleVideoEnd.bind(this);
     this._handleHlsLevels = this._handleHlsLevels.bind(this);
-    
+    this._handleHlsLevelSwitch = this._handleHlsLevelSwitch.bind(this);
+    this._setCurrentQualitySource = this._setCurrentQualitySource.bind(this);
+
     // Set up video event listeners
-    this._setupVideoListeners();
-    this.video.addEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+    this._cleanupVideoListeners = this._setupVideoListeners();
     this._setupAutoUnmute();
   }
 
   _setupVideoListeners() {
-    this.video.addEventListener('loadedmetadata', () => this._initControls());
-    this.video.addEventListener('error', (e) => {
-      this.logger.error('🎬 Video error:', this.video.error);
-    });
+    if (!this._onLoadedMetadata) {
+      this._onLoadedMetadata = () => this._initControls();
+    }
+    if (!this._onVideoError) {
+      this._onVideoError = () => {
+        this.logger.error('Video error:', this.video.error);
+      };
+    }
+
+    this.video.addEventListener('loadedmetadata', this._onLoadedMetadata);
+    this.video.addEventListener('error', this._onVideoError);
     this.video.addEventListener('ended', this._handleVideoEnd);
+    this.video.addEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+    this.video.addEventListener('peekplayer:hls-level-switch', this._handleHlsLevelSwitch);
+
+    return () => {
+      if (this._onLoadedMetadata) {
+        this.video.removeEventListener('loadedmetadata', this._onLoadedMetadata);
+        this._onLoadedMetadata = null;
+      }
+      if (this._onVideoError) {
+        this.video.removeEventListener('error', this._onVideoError);
+        this._onVideoError = null;
+      }
+      this.video.removeEventListener('ended', this._handleVideoEnd);
+      this.video.removeEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+      this.video.removeEventListener('peekplayer:hls-level-switch', this._handleHlsLevelSwitch);
+    };
   }
 
   _handleHlsLevels(event) {
@@ -232,14 +418,74 @@ export class PeekPlayer {
       return;
     }
 
-    this.logger.log('🎬 Updating sources from HLS levels:', detail.sources.length);
-    this.sourcesData = detail;
-
-    if (this.engine && typeof this.engine.setSourcesData === 'function') {
-      this.engine.setSourcesData(detail);
+    const processed = processVideoSources(detail);
+    if (!processed?.sources?.length) {
+      this.logger.warn('Received HLS levels but none were valid after processing');
+      return;
     }
 
-    this._updateQualitySelector(detail);
+    this.logger.log('Updating sources from HLS levels:', processed.sources.length);
+    this.sourcesData = processed;
+
+    if (!this._currentQualitySource && processed.sources.length) {
+      this._currentQualitySource = processed.sources[0];
+    }
+
+    if (this.engine && typeof this.engine.setSourcesData === 'function') {
+      this.engine.setSourcesData(processed);
+    }
+
+    this._updateQualitySelector(processed);
+
+    const activeLevel = typeof detail.currentLevel === 'number' ? detail.currentLevel : null;
+    if (typeof activeLevel === 'number') {
+      const matching = processed.sources.find((source) =>
+        typeof source.hlsLevel === 'number' ? source.hlsLevel === activeLevel : source.index === activeLevel
+      );
+      if (matching) {
+        this._setCurrentQualitySource(matching);
+      }
+    }
+  }
+
+  _handleHlsLevelSwitch(event) {
+    const detail = event?.detail;
+    const source = detail?.source;
+    if (!source || !this.sourcesData?.sources?.length) {
+      return;
+    }
+
+    const matching = this.sourcesData.sources.find((candidate) => {
+      if (candidate.isAuto) {
+        return false;
+      }
+      if (typeof candidate.hlsLevel === 'number') {
+        return candidate.hlsLevel === source.hlsLevel;
+      }
+      return candidate.index === source.index;
+    }) || source;
+
+    this._setCurrentQualitySource(matching);
+  }
+
+  _setCurrentQualitySource(source) {
+    if (!source) {
+      return;
+    }
+
+    this._currentQualitySource = source;
+
+    if (this.controlsContainer) {
+      const qualitySelector = this.controlsContainer.querySelector('.quality-selector');
+      if (qualitySelector && typeof qualitySelector.setActiveQuality === 'function') {
+        qualitySelector.setActiveQuality(source);
+      }
+    }
+
+    if (typeof this.options.onQualityChange === 'function') {
+      const displayName = source.displayName || source.quality || (source.height ? `${source.height}p` : 'Auto');
+      this.options.onQualityChange(displayName);
+    }
   }
 
   _updateQualitySelector(sourcesData) {
@@ -250,6 +496,9 @@ export class PeekPlayer {
     const qualitySelector = this.controlsContainer.querySelector('.quality-selector');
     if (qualitySelector && typeof qualitySelector.updateSources === 'function') {
       qualitySelector.updateSources(sourcesData);
+      if (this._currentQualitySource && typeof qualitySelector.setActiveQuality === 'function') {
+        qualitySelector.setActiveQuality(this._currentQualitySource);
+      }
     }
   }
 
@@ -264,7 +513,7 @@ export class PeekPlayer {
         return;
       }
 
-      this.logger.log('🎬 Auto-unmute triggered by user interaction');
+      this.logger.log('Auto-unmute triggered by user interaction');
       this.video.muted = false;
       this.video.removeAttribute('muted');
       cleanup();
@@ -286,12 +535,13 @@ export class PeekPlayer {
 
   _handleVideoEnd() {
     if (this.autoNext && typeof this.options.onSkip === 'function') {
-      this.logger.log('🎬 AutoNext triggered on ended');
+      this.logger.log('AutoNext triggered on ended');
       this.options.onSkip('next');
     }
   }
 
   _initControls(force = false) {
+    if (this._isDestroyed) return;
     if (this.controlsInitialized && !force) return;
 
     if (force && this.controlsCleanup) {
@@ -301,8 +551,9 @@ export class PeekPlayer {
     }
 
     if (this.controlsInitialized) return;
+    this._clearControlsFallback();
     this.controlsInitialized = true;
-    
+
     const callbackKeys = [
       'onPlaybackChange',
       'onSeek',
@@ -311,7 +562,8 @@ export class PeekPlayer {
       'onTimeUpdate',
       'onSkip',
       'onPipChange',
-      'onQualityChange'
+      'onQualityChange',
+      'onSubtitleChange'
     ];
 
     const callbacks = callbackKeys.reduce((acc, key) => {
@@ -328,10 +580,13 @@ export class PeekPlayer {
       segments: this.options.segments || [],
       context: {
         player: this,
-        overlayContainer: this.overlayContainer
+        overlayContainer: this.overlayContainer,
+        playerWrapper: this.playerWrapper
       },
       segmentAutoSkip: this.options.segmentAutoSkip,
-      nativeControlsForMobile: !!this.options.nativeControlsForMobile
+      nativeControlsForMobile: !!this.options.nativeControlsForMobile,
+      playerWrapper: this.playerWrapper,
+      overlayContainer: this.overlayContainer
     });
 
     if (this.sourcesData) {
@@ -345,6 +600,27 @@ export class PeekPlayer {
       this.controlsCleanup = null;
     }
     this.controlsInitialized = false;
+  }
+
+  _clearControlsFallback() {
+    if (this._initControlsTimeout) {
+      clearTimeout(this._initControlsTimeout);
+      this._initControlsTimeout = null;
+    }
+  }
+
+  _scheduleControlsFallback() {
+    if (this._isDestroyed) {
+      return;
+    }
+    this._clearControlsFallback();
+    this._initControlsTimeout = setTimeout(() => {
+      if (this._isDestroyed || this.controlsInitialized) {
+        return;
+      }
+      this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
+      this._initControls();
+    }, 2000);
   }
 
   refreshControls() {
@@ -434,7 +710,6 @@ export class PeekPlayer {
 
     if (typeof partialOptions.segmentAutoSkip !== 'undefined') {
       this.options.segmentAutoSkip = partialOptions.segmentAutoSkip;
-      console.log(this.options.segmentAutoSkip);
       shouldRefreshControls = true;
     }
 
@@ -448,6 +723,7 @@ export class PeekPlayer {
     assertType(url, 'string', 'url', { component: 'PeekPlayer', method: 'loadSource' });
     
     try {
+      this._isDestroyed = false;
       // Pass current sources for engine selection
       const sources = this.sourcesData?.sources || [];
       this.engine = await initializeVideoEngine(this.video, url, this.options, sources, this.logger);
@@ -461,12 +737,7 @@ export class PeekPlayer {
       }
       
       // Force controls initialization after a delay if metadata doesn't load
-      setTimeout(() => {
-        if (!this.controlsInitialized) {
-          this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
-          this._initControls();
-        }
-      }, 2000);
+      this._scheduleControlsFallback();
       
       return this;
     } catch (error) {
@@ -480,18 +751,23 @@ export class PeekPlayer {
     assert(Array.isArray(sources), 'sources must be an array', { component: 'PeekPlayer', method: 'loadSources' });
     
     // Process and sort sources
+    this._isDestroyed = false;
     const sourcesData = { sources, headers };
     const processedSources = processVideoSources(sourcesData);
-    
+
     if (!processedSources?.sources?.length) {
       throw new Error('No valid sources provided');
     }
-    
+
     this.sourcesData = processedSources;
-    
+
+    if (processedSources.sources.length) {
+      this._currentQualitySource = processedSources.sources[0];
+    }
+
     // Load the highest quality source first
     const initialSource = processedSources.sources[0];
-    
+
     // Initialize engine with sources for proper engine selection
     this.engine = await initializeVideoEngine(this.video, initialSource.url, this.options, processedSources.sources, this.logger);
     this.video._engine = this.engine;
@@ -503,12 +779,7 @@ export class PeekPlayer {
     }
     
     // Force controls initialization after a delay if metadata doesn't load
-    setTimeout(() => {
-      if (!this.controlsInitialized) {
-        this.logger.warn('🎬 Video metadata not loaded after 2s, initializing controls anyway');
-        this._initControls();
-      }
-    }, 2000);
+    this._scheduleControlsFallback();
     
     // Set sources data on the engine for quality switching
     if (this.engine && this.engine.setSourcesData) {
@@ -554,16 +825,20 @@ export class PeekPlayer {
   }
 
   destroy() {
+    this._isDestroyed = true;
     if (this.engine) {
       this.engine.destroy();
       this.engine = null;
     }
     this.sourcesData = null;
+    this._clearControlsFallback();
     this._teardownControls();
     if (typeof this._autoUnmuteCleanup === 'function') {
       this._autoUnmuteCleanup();
     }
-    this.video.removeEventListener('peekplayer:hls-levels', this._handleHlsLevels);
+    if (typeof this._cleanupVideoListeners === 'function') {
+      this._cleanupVideoListeners();
+    }
   }
 }
 

@@ -1,7 +1,7 @@
 import { createTooltip } from './base-tooltip.js';
 import { TIMING } from '../../constants/timing.js';
 
-export function createVolumeTooltip(slider, video) {
+export function createVolumeTooltip(slider, video, options = {}) {
     let hoverValue = null;
     
     function getVolumeAtPosition(e) {
@@ -15,6 +15,7 @@ export function createVolumeTooltip(slider, video) {
         position: 'top',
         delay: TIMING.TOOLTIP_DELAY_FAST,
         dynamic: true,
+        isMobile: options.isMobile,
         getContent: () => {
             if (hoverValue !== null) {
                 const volume = Math.round(hoverValue * 100);
@@ -29,15 +30,10 @@ export function createVolumeTooltip(slider, video) {
     function handleMouseMove(e) {
         hoverValue = getVolumeAtPosition(e);
         
-        // Force tooltip update during mousemove
-        const volume = Math.round(hoverValue * 100);
-        const newText = `${volume}%`;
-        
-        // Direct DOM update for real-time feedback
-        const tooltipElement = document.querySelector('.tooltip.tooltip--visible');
-        if (tooltipElement) {
-            tooltipElement.textContent = newText;
-        }
+        // Live-update the tooltip text while hovering/dragging. The tooltip
+        // element lives in document.body, so we go through the tooltip API
+        // instead of querying the DOM (which breaks with multiple players).
+        tooltip.updateContent?.();
     }
     
     function handleMouseLeave() {

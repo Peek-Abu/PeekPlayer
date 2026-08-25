@@ -41,7 +41,7 @@ function formatTime(seconds) {
 }
 
 export function createSegmentedScrubber(options = {}) {
-  const { onSeek, getSegments, segmentGap } = options;
+  const { onSeek, getSegments, segmentGap, onScrubPreview, onScrubStart, onScrubEnd } = options;
   const segmentHooksOption = options.segmentHooks ?? {};
 
   if (onSeek) {
@@ -341,21 +341,23 @@ export function createSegmentedScrubber(options = {}) {
     }
   }
 
-  function updateFromPointer(event) {
+  // During a drag we only update the visual preview; hammering
+  // video.currentTime on every pointermove causes constant seeking/hitches.
+  // The actual seek is committed once on pointer-down (tap-to-seek) and once
+  // on release.
+  function updateFromPointerPreview(event) {
     if (duration <= 0) return;
     const rect = track.getBoundingClientRect();
     if (!rect.width) return;
 
     const percent = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-    const nextTime = percent * duration;
-    const previous = currentTime;
-    currentTime = nextTime;
+    currentTime = percent * duration;
     updateVisualState();
-    if (onSeek) {
-      onSeek(nextTime, nextTime - previous, percent);
+    if (onScrubPreview) {
+      onScrubPreview(currentTime);
     }
 
-    const hoverIndex = findSegmentIndexAtTime(nextTime);
+    const hoverIndex = findSegmentIndexAtTime(currentTime);
     setHoveredSegment(hoverIndex);
   }
 
@@ -366,8 +368,30 @@ export function createSegmentedScrubber(options = {}) {
     root.focus({ preventScroll: true });
     isScrubbing = true;
     root.classList.add('segmented-scrubber--scrubbing');
-    root.setPointerCapture(event.pointerId);
-    updateFromPointer(event);
+    // Some environments throw for pointer ids that have no active pointer
+    try {
+      root.setPointerCapture(event.pointerId);
+    } catch (_) {
+      // Capture is an optimization; scrubbing still works without it.
+    }
+    // Tap-to-seek: commit immediately on press
+    if (onScrubStart) {
+      onScrubStart();
+    }
+    seekToFromPointer(event);
+  }
+
+  function seekToFromPointer(event) {
+    if (duration <= 0) return;
+    const rect = track.getBoundingClientRect();
+    if (!rect.width) return;
+    const percent = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    seekTo(percent * duration);
+    if (onScrubPreview) {
+      onScrubPreview(currentTime);
+    }
+    const hoverIndex = findSegmentIndexAtTime(currentTime);
+    setHoveredSegment(hoverIndex);
   }
 
   function handlePointerMove(event) {
@@ -382,20 +406,28 @@ export function createSegmentedScrubber(options = {}) {
     }
 
     if (isScrubbing) {
-      updateFromPointer(event);
+      updateFromPointerPreview(event);
     }
   }
 
   function finishScrub(event) {
     if (!isScrubbing) return;
     if (event && root.hasPointerCapture(event.pointerId)) {
-      root.releasePointerCapture(event.pointerId);
+      try {
+        root.releasePointerCapture(event.pointerId);
+      } catch (_) {
+        // Pointer may already be released.
+      }
     }
     if (event) {
-      updateFromPointer(event);
+      // Commit the final seek position on release
+      seekToFromPointer(event);
     }
     isScrubbing = false;
     root.classList.remove('segmented-scrubber--scrubbing');
+    if (onScrubEnd) {
+      onScrubEnd();
+    }
   }
 
   function handlePointerUp(event) {

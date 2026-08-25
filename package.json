@@ -3,26 +3,31 @@
   "version": "1.1.0",
   "type": "module",
   "description": "Professional HTML5 video player with HLS support, custom controls, and multi-quality streaming",
-  "main": "dist/peekplayer.js",
+  "main": "dist/peekplayer.cjs",
   "module": "dist/peekplayer.esm.js",
   "types": "dist/peekplayer.d.ts",
   "exports": {
     ".": {
+      "types": "./dist/peekplayer.d.ts",
       "import": "./dist/peekplayer.esm.js",
-      "require": "./dist/peekplayer.js",
-      "types": "./dist/peekplayer.d.ts"
+      "require": "./dist/peekplayer.cjs",
+      "default": "./dist/peekplayer.esm.js"
     },
     "./css": "./dist/peekplayer.css"
   },
   "files": [
     "dist/",
     "README.md",
-    "LICENSE"
+    "LICENSE",
+    "CHANGELOG.md"
   ],
   "scripts": {
     "build": "rollup -c",
     "dev": "rollup -c -w",
     "serve": "http-server . -p 3001 -a 0.0.0.0",
+    "test": "node scripts/smoke-test.mjs",
+    "test:ui": "playwright test",
+    "lint": "eslint src",
     "prepare": "npm run build"
   },
   "keywords": [
@@ -47,16 +52,14 @@
   "bugs": {
     "url": "https://github.com/peek-abu/PeekPlayer/issues"
   },
-  "dependencies": {
-    "hls.js": ">=1.5.20"
-  },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-terser": "^0.4.4",
+    "eslint": "^9.39.5",
+    "globals": "^16.5.0",
+    "hls.js": ">=1.5.20",
     "http-server": "^14.1.1",
     "rollup": "^4.9.6"
-  },
-  "peerDependencies": {
-    "hls.js": ">=1.5.20"
   }
 }

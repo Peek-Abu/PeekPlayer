@@ -1,8 +1,11 @@
+// Handles the auto-hide behavior for video player controls during playback.
 import { TIMING } from '../constants/timing.js';
 
-export function setupAutoHideControls(video, controlsElement, playerWrapper) {
+export function setupAutoHideControls(video, controlsElements, playerWrapper, options = {}) {
+    const hideDelay = options.isMobile
+        ? TIMING.CONTROLS_AUTO_HIDE_DELAY_MOBILE
+        : TIMING.CONTROLS_AUTO_HIDE_DELAY;
     let hideTimeout = null;
-    let isMouseOverPlayer = playerWrapper.matches(':hover');
     let controlsVisible = true;
     
     // Create vignette overlay for better contrast when controls are visible
@@ -14,13 +17,15 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
         if (hideTimeout) {
             clearTimeout(hideTimeout);
         }
-        hideTimeout = setTimeout(hideControls, TIMING.CONTROLS_AUTO_HIDE_DELAY);
+        hideTimeout = setTimeout(hideControls, hideDelay);
     }
 
     function showControls() {
         if (!controlsVisible) {
-            controlsElement.style.opacity = '1';
-            controlsElement.style.pointerEvents = 'auto';
+            for (let i = 0; i < controlsElements.length; i++) {
+                controlsElements[i].style.opacity = '1';
+                controlsElements[i].style.pointerEvents = 'auto';
+            }
             controlsVisible = true;
         }
 
@@ -46,8 +51,10 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
 
     function hideControls() {
         if (controlsVisible && !video.paused) {
-            controlsElement.style.opacity = '0';
-            controlsElement.style.pointerEvents = 'none';
+            for (let i = 0; i < controlsElements.length; i++) {
+                controlsElements[i].style.opacity = '0';
+                controlsElements[i].style.pointerEvents = 'none';
+            }
             controlsVisible = false;
 
             // Hide vignette when controls are hidden
@@ -64,19 +71,23 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
     }
     
     function handleMouseEnter() {
-        isMouseOverPlayer = true;
         showControls();
     }
 
     
     function handleMouseLeave() {
-        isMouseOverPlayer = false;
         if (!video.paused) {
             scheduleHide();
         }
     }
 
     function handleMouseMove() {
+        showControls();
+    }
+
+    // Pure-touch devices never fire mousemove: tapping the video must summon
+    // the controls (the tap's click still toggles play via video-interactions).
+    function handleTouchStart() {
         showControls();
     }
     
@@ -103,16 +114,20 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
         if (video.paused) {
             vignette.classList.add('paused');
             vignette.style.opacity = '1';
-            controlsElement.style.opacity = '1';
-            controlsElement.style.pointerEvents = 'auto';
+            for (let i = 0; i < controlsElements.length; i++) {
+                controlsElements[i].style.opacity = '1';
+                controlsElements[i].style.pointerEvents = 'auto';
+            }
             controlsVisible = true;
         }
     }
     
     // Set initial styles for smooth transitions
-    controlsElement.style.transition = `opacity ${TIMING.TRANSITION_DURATION}ms ease, pointer-events ${TIMING.TRANSITION_DURATION}ms ease`;
-    controlsElement.style.opacity = '1';
-    controlsElement.style.pointerEvents = 'auto';
+    for (let i = 0; i < controlsElements.length; i++) {
+        controlsElements[i].style.transition = `opacity ${TIMING.TRANSITION_DURATION}ms ease, pointer-events ${TIMING.TRANSITION_DURATION}ms ease`;
+        controlsElements[i].style.opacity = '1';
+        controlsElements[i].style.pointerEvents = 'auto';
+    }
     playerWrapper.style.cursor = 'default';
     video.style.cursor = 'default';
     
@@ -120,6 +135,7 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
     playerWrapper.addEventListener('mouseenter', handleMouseEnter);
     playerWrapper.addEventListener('mouseleave', handleMouseLeave);
     playerWrapper.addEventListener('mousemove', handleMouseMove);
+    playerWrapper.addEventListener('touchstart', handleTouchStart, { passive: true });
     video.addEventListener('play', handlePlay);
     video.addEventListener('pause', handlePause);
     
@@ -137,11 +153,19 @@ export function setupAutoHideControls(video, controlsElement, playerWrapper) {
             clearTimeout(hideTimeout);
         }
         vignette.remove();
+        // Restore controls in case we were destroyed mid-hide, otherwise a
+        // re-initialized player inherits invisible controls.
+        for (let i = 0; i < controlsElements.length; i++) {
+            controlsElements[i].style.opacity = '';
+            controlsElements[i].style.pointerEvents = '';
+            controlsElements[i].style.transition = '';
+        }
         playerWrapper.style.cursor = 'default';
         video.style.cursor = 'default';
         playerWrapper.removeEventListener('mouseenter', handleMouseEnter);
         playerWrapper.removeEventListener('mouseleave', handleMouseLeave);
         playerWrapper.removeEventListener('mousemove', handleMouseMove);
+        playerWrapper.removeEventListener('touchstart', handleTouchStart);
         video.removeEventListener('play', handlePlay);
         video.removeEventListener('pause', handlePause);
     };
