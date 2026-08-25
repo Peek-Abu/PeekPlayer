@@ -101,6 +101,10 @@ npm run dev      # Development with watch
 npm run serve    # Local server
 ```
 
+## Changelog
+
+See [CHANGELOG.md](./CHANGELOG.md) for release notes (Keep a Changelog format).
+
 ## Issue Tracking
 
 <p align="center">
