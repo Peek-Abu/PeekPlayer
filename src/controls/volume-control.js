@@ -40,7 +40,9 @@ export function createVolumeControl(video, onVolumeChange, options = {}) {
     slider.min = '0';
     slider.max = '100';
     slider.step = '1';
-    slider.value = Math.round(video.volume * 100);
+    // Respect initial muted state (autoplay always starts muted — without
+    // this the icon says "muted" while the bar shows 100%).
+    slider.value = video.muted ? 0 : Math.round(video.volume * 100);
     slider.setAttribute('aria-label', 'Volume');
     slider.style.pointerEvents = 'auto';
     const volumeTooltip = createVolumeTooltip(slider, video, {
@@ -68,11 +70,21 @@ export function createVolumeControl(video, onVolumeChange, options = {}) {
         }
     }
     
+    // Sync the slider UI from the video's actual state
+    function syncSliderFromVideo() {
+        slider.value = video.muted ? 0 : Math.round(video.volume * 100);
+        updateVolumeProgress();
+        updateMuteIcon();
+    }
+
     // Event handlers
     muteBtn.onclick = (e) => {
         e.stopPropagation();
         video.muted = !video.muted;
-        updateMuteIcon();
+        // Update the bar explicitly; don't rely on the volumechange event
+        // arriving (or having arrived) while listeners were attaching.
+        syncSliderFromVideo();
+        volumeTooltip?.updateContent?.();
         if (onVolumeChange) onVolumeChange(video.muted ? 0 : video.volume);
     };
     
@@ -81,9 +93,23 @@ export function createVolumeControl(video, onVolumeChange, options = {}) {
         video.volume = volume;
         video.muted = false;
         updateMuteIcon();
-        updateVolumeProgress(); // Add this line
+        updateVolumeProgress();
         if (onVolumeChange) onVolumeChange(volume);
     };
+
+    // Mouse wheel over the volume control adjusts volume
+    const handleWheel = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const step = e.deltaY < 0 ? 0.05 : -0.05;
+        const next = Math.min(1, Math.max(0, video.volume + step));
+        video.volume = next;
+        video.muted = false;
+        syncSliderFromVideo();
+        volumeTooltip?.updateContent?.();
+        if (onVolumeChange) onVolumeChange(next);
+    };
+    container.addEventListener('wheel', handleWheel, { passive: false });
     
     // Hover events for volume popup
     let hoverTimeout;
@@ -104,23 +130,17 @@ export function createVolumeControl(video, onVolumeChange, options = {}) {
     });
     
     // Update volume slider when video volume changes
-    const handleVolumeChange = () => {
-        // If muted, set slider to 0, otherwise use current volume
-        slider.value = video.muted ? 0 : Math.round(video.volume * 100);
-        updateVolumeProgress();
-        updateMuteIcon();
-    };
-    video.addEventListener('volumechange', handleVolumeChange);
+    video.addEventListener('volumechange', syncSliderFromVideo);
     
     // Initial icon update
-    updateMuteIcon();
-    updateVolumeProgress();
+    syncSliderFromVideo();
     container.appendChild(muteBtn);
     if (!options.isMobile) {
         container.appendChild(volumeSlider);
     }
     return { element: container, cleanup: () => {
-        video.removeEventListener('volumechange', handleVolumeChange);
+        video.removeEventListener('volumechange', syncSliderFromVideo);
+        container.removeEventListener('wheel', handleWheel);
         if (hoverTimeout) {
             clearTimeout(hoverTimeout);
             hoverTimeout = null;

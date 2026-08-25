@@ -30,17 +30,10 @@ export function createVolumeTooltip(slider, video, options = {}) {
     function handleMouseMove(e) {
         hoverValue = getVolumeAtPosition(e);
         
-        // Force tooltip update during mousemove
-        const volume = Math.round(hoverValue * 100);
-        const newText = `${volume}%`;
-        
-        // Direct DOM update for real-time feedback. Scoped to this player's
-        // wrapper so we never write into another instance's tooltip.
-        const scope = slider.closest('.peekplayer-wrapper') || document;
-        const tooltipElement = scope.querySelector('.tooltip.tooltip--visible');
-        if (tooltipElement) {
-            tooltipElement.textContent = newText;
-        }
+        // Live-update the tooltip text while hovering/dragging. The tooltip
+        // element lives in document.body, so we go through the tooltip API
+        // instead of querying the DOM (which breaks with multiple players).
+        tooltip.updateContent?.();
     }
     
     function handleMouseLeave() {

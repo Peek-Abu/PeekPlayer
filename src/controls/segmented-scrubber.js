@@ -41,7 +41,7 @@ function formatTime(seconds) {
 }
 
 export function createSegmentedScrubber(options = {}) {
-  const { onSeek, getSegments, segmentGap } = options;
+  const { onSeek, getSegments, segmentGap, onScrubPreview, onScrubStart, onScrubEnd } = options;
   const segmentHooksOption = options.segmentHooks ?? {};
 
   if (onSeek) {
@@ -353,6 +353,9 @@ export function createSegmentedScrubber(options = {}) {
     const percent = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     currentTime = percent * duration;
     updateVisualState();
+    if (onScrubPreview) {
+      onScrubPreview(currentTime);
+    }
 
     const hoverIndex = findSegmentIndexAtTime(currentTime);
     setHoveredSegment(hoverIndex);
@@ -365,8 +368,16 @@ export function createSegmentedScrubber(options = {}) {
     root.focus({ preventScroll: true });
     isScrubbing = true;
     root.classList.add('segmented-scrubber--scrubbing');
-    root.setPointerCapture(event.pointerId);
+    // Some environments throw for pointer ids that have no active pointer
+    try {
+      root.setPointerCapture(event.pointerId);
+    } catch (_) {
+      // Capture is an optimization; scrubbing still works without it.
+    }
     // Tap-to-seek: commit immediately on press
+    if (onScrubStart) {
+      onScrubStart();
+    }
     seekToFromPointer(event);
   }
 
@@ -376,6 +387,9 @@ export function createSegmentedScrubber(options = {}) {
     if (!rect.width) return;
     const percent = clamp((event.clientX - rect.left) / rect.width, 0, 1);
     seekTo(percent * duration);
+    if (onScrubPreview) {
+      onScrubPreview(currentTime);
+    }
     const hoverIndex = findSegmentIndexAtTime(currentTime);
     setHoveredSegment(hoverIndex);
   }
@@ -399,7 +413,11 @@ export function createSegmentedScrubber(options = {}) {
   function finishScrub(event) {
     if (!isScrubbing) return;
     if (event && root.hasPointerCapture(event.pointerId)) {
-      root.releasePointerCapture(event.pointerId);
+      try {
+        root.releasePointerCapture(event.pointerId);
+      } catch (_) {
+        // Pointer may already be released.
+      }
     }
     if (event) {
       // Commit the final seek position on release
@@ -407,6 +425,9 @@ export function createSegmentedScrubber(options = {}) {
     }
     isScrubbing = false;
     root.classList.remove('segmented-scrubber--scrubbing');
+    if (onScrubEnd) {
+      onScrubEnd();
+    }
   }
 
   function handlePointerUp(event) {

@@ -155,9 +155,30 @@ export function setupOverlayControls(video, container, options = {}) {
   const overlayRoot = overlayContainerOption || context.overlayContainer || resolvedWrapper.querySelector('.peekplayer-overlay');
 
   // Initialize all controls
-  const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek, options);
+  // The scrubber reports its drag-preview position; the time display binds to
+  // it below so users see the target time while scrubbing (before the seek
+  // is committed on release).
+  let scrubPreviewTarget = null;
+  const scrubberOptions = {
+    ...options,
+    onScrubPreview: (time) => {
+      if (scrubPreviewTarget) scrubPreviewTarget(time);
+    },
+    onScrubStart: () => {
+      if (scrubScrubbingToggle) scrubScrubbingToggle(true);
+    },
+    onScrubEnd: () => {
+      if (scrubScrubbingToggle) scrubScrubbingToggle(false);
+    }
+  };
+  const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek, scrubberOptions);
   const { element: controlRow, cleanup: controlRowCleanup, childElements } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context: { ...context, playerWrapper: resolvedWrapper }, logger, isMobile });
   const { element: pausedOverlay, playPauseButton, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange, resolvedWrapper, overlayRoot);
+
+  if (childElements.timeDisplay?.setCurrentTime) {
+    scrubPreviewTarget = (time) => childElements.timeDisplay.setCurrentTime(time);
+  }
+  const scrubScrubbingToggle = childElements.timeDisplay?.setScrubbing?.bind(childElements.timeDisplay);
   // Assert control components were created successfully
   assertElement(scrubberBar, 'scrubberBar', { component: 'Controls', method: 'setupOverlayControls' });
   assertElement(controlRow, 'controlRow', { component: 'Controls', method: 'setupOverlayControls' });

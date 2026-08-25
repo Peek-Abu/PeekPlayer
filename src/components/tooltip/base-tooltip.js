@@ -88,14 +88,22 @@ export function createTooltip(element, options = {}) {
         }
     }
     
+    function updateContent() {
+        if (tooltip && dynamic && getContent) {
+            tooltip.textContent = getContent();
+        }
+    }
+    
     // Event listeners
     element.addEventListener('mouseenter', showTooltip);
     element.addEventListener('mouseleave', hideTooltip);
     element.addEventListener('focus', showTooltip);
     element.addEventListener('blur', hideTooltip);
     
-    // Return cleanup function
-    return function cleanup() {
+    // Return cleanup function; expose updateContent() so owners can refresh
+    // the text live (e.g. while dragging the volume slider) without reaching
+    // into the DOM.
+    function cleanup() {
         clearTimeout(showTimeout);
         clearTimeout(hideTimeout);
         element.removeEventListener('mouseenter', showTooltip);
@@ -107,5 +115,7 @@ export function createTooltip(element, options = {}) {
             document.body.removeChild(tooltip);
             tooltip = null;
         }
-    };
+    }
+    cleanup.updateContent = updateContent;
+    return cleanup;
 }
