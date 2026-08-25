@@ -25,6 +25,7 @@
     "dev": "rollup -c -w",
     "serve": "http-server . -p 3001 -a 0.0.0.0",
     "test": "node scripts/smoke-test.mjs",
+    "test:ui": "playwright test",
     "lint": "eslint src",
     "prepare": "npm run build"
   },
@@ -51,6 +52,7 @@
     "url": "https://github.com/peek-abu/PeekPlayer/issues"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-terser": "^0.4.4",
     "eslint": "^9.39.5",

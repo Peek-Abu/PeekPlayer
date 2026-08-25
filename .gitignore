@@ -46,3 +46,8 @@ coverage/
 # Editor files
 *~
 .#*
+
+# Playwright
+test-results/
+playwright-report/
+
