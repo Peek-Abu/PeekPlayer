@@ -704,3 +704,14 @@ button:focus {
     margin-top: -6px;
   }
 }
+/* Mobile swipe seek indicator */
+@keyframes peekplayer-fade-in-out {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.8); }
+  20% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  80% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(0.9); }
+}
+
+.seek-indicator {
+  will-change: opacity, transform;
+}

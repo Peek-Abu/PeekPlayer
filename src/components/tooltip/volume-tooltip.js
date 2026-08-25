@@ -34,8 +34,10 @@ export function createVolumeTooltip(slider, video, options = {}) {
         const volume = Math.round(hoverValue * 100);
         const newText = `${volume}%`;
         
-        // Direct DOM update for real-time feedback
-        const tooltipElement = document.querySelector('.tooltip.tooltip--visible');
+        // Direct DOM update for real-time feedback. Scoped to this player's
+        // wrapper so we never write into another instance's tooltip.
+        const scope = slider.closest('.peekplayer-wrapper') || document;
+        const tooltipElement = scope.querySelector('.tooltip.tooltip--visible');
         if (tooltipElement) {
             tooltipElement.textContent = newText;
         }

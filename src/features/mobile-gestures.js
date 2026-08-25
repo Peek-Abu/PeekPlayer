@@ -1,38 +1,43 @@
 import { TIMING } from '../constants/timing.js';
 
-export function setupMobileGestures(video, playerWrapper, player) {
-    if (!('ontouchstart' in window)) return; // Skip on desktop
+export function setupMobileGestures(video, playerWrapper, logger) {
+    if (typeof window === 'undefined' || !('ontouchstart' in window)) return null; // Skip on desktop
     
     let touchStartX = 0;
     let touchStartY = 0;
-    let touchStartTime = 0;
     let isSeeking = false;
+    let seekBaseTime = 0;
     
     const handleTouchStart = (e) => {
         if (e.touches.length === 1) {
             touchStartX = e.touches[0].clientX;
             touchStartY = e.touches[0].clientY;
-            touchStartTime = Date.now();
+            isSeeking = false;
         }
     };
     const handleTouchMove = (e) => {
-        if (e.touches.length === 1 && !isSeeking) {
+        if (e.touches.length === 1) {
             const deltaX = e.touches[0].clientX - touchStartX;
             const deltaY = Math.abs(e.touches[0].clientY - touchStartY);
             
             if (Math.abs(deltaX) > TIMING.SWIPE_THRESHOLD && deltaY < TIMING.SWIPE_VERTICAL_LIMIT) {
-                isSeeking = true;
-                const seekAmount = deltaX / TIMING.VOLUME_PIXEL_TO_SECOND_RATIO; // pixels to seconds
-                const currentTime = player ? player.currentTime() : video.currentTime;
-                const newTime = Math.max(0, currentTime + seekAmount);
-                if (player) {
-                    player.currentTime(newTime);
+                if (!isSeeking) {
+                    isSeeking = true;
+                    seekBaseTime = video.currentTime || 0;
+                }
+
+                // Live scrubbing: recompute from the touch origin so the seek
+                // tracks the finger instead of latching at the threshold.
+                const seekAmount = deltaX / TIMING.SWIPE_PIXEL_TO_SECOND_RATIO;
+                const newTime = Math.max(0, seekBaseTime + seekAmount);
+                if (Number.isFinite(video.duration) && video.duration > 0) {
+                    video.currentTime = Math.min(newTime, video.duration);
                 } else {
                     video.currentTime = newTime;
                 }
                 
                 // Show seek indicator
-                showSeekIndicator(seekAmount > 0 ? 'forward' : 'backward');
+                showSeekIndicator(playerWrapper, seekAmount > 0 ? 'forward' : 'backward');
             }
         }
     };
@@ -41,39 +46,25 @@ export function setupMobileGestures(video, playerWrapper, player) {
         isSeeking = false;
     };
     
-    // Double tap for fullscreen
-    let lastTap = 0;
-    const handleTouchEndFullscreen = (e) => {
-        const currentTime = Date.now();
-        const tapLength = currentTime - lastTap;
-        
-        if (tapLength < TIMING.DOUBLE_TAP_THRESHOLD && tapLength > 0) {
-            // Double tap detected
-            if (document.fullscreenElement) {
-                document.exitFullscreen();
-            } else {
-                const wrapper = playerWrapper || video.closest('.peekplayer-wrapper') || video.parentElement;
-                if (wrapper?.requestFullscreen) {
-                    wrapper.requestFullscreen();
-                }
-            }
-        }
-        lastTap = currentTime;
-    };
+    // Note: double-tap fullscreen is intentionally NOT handled here.
+    // setupVideoInteractions already detects double clicks (including the
+    // synthetic clicks produced by taps) and toggles fullscreen; handling it
+    // in both places caused double toggles / races.
     
     video.addEventListener('touchstart', handleTouchStart, { passive: true });
     video.addEventListener('touchmove', handleTouchMove, { passive: true });
     video.addEventListener('touchend', handleTouchEnd, { passive: true });
-    video.addEventListener('touchend', handleTouchEndFullscreen);
     return () => {
         video.removeEventListener('touchstart', handleTouchStart);
         video.removeEventListener('touchmove', handleTouchMove);
         video.removeEventListener('touchend', handleTouchEnd);
-        video.removeEventListener('touchend', handleTouchEndFullscreen);
     };
 }
 
-function showSeekIndicator(direction) {
+function showSeekIndicator(wrapper, direction) {
+    if (!(wrapper instanceof HTMLElement)) {
+        return;
+    }
     const indicator = document.createElement('div');
     indicator.className = 'seek-indicator';
     indicator.textContent = direction === 'forward' ? '⏩' : '⏪';
@@ -89,9 +80,9 @@ function showSeekIndicator(direction) {
         font-size: 24px;
         z-index: 1000;
         pointer-events: none;
-        animation: fadeInOut 1s ease;
+        animation: peekplayer-fade-in-out ${TIMING.SEEK_INDICATOR_DURATION}ms ease;
     `;
     
-    document.querySelector('.video-container').appendChild(indicator);
+    wrapper.appendChild(indicator);
     setTimeout(() => indicator.remove(), TIMING.SEEK_INDICATOR_DURATION);
 }

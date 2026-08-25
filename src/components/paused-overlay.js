@@ -18,7 +18,6 @@ export function createPausedOverlay(video, onPlaybackChange, playerWrapper, over
     overlay.style.bottom = '0';
     overlay.style.left = '0';
     overlay.style.pointerEvents = 'none';
-    overlay.style.opacity = '1';
     overlay.style.display = 'flex';
     if (playerWrapper && overlay.parentElement !== playerWrapper) {
         playerWrapper.appendChild(overlay);
@@ -28,7 +27,6 @@ export function createPausedOverlay(video, onPlaybackChange, playerWrapper, over
     const playButton = document.createElement('button');
     playButton.className = 'paused-play-button';
     playButton.setAttribute('aria-label', 'Play');
-    playButton.style.pointerEvents = 'auto';
     playButton.innerHTML = ICONS.PLAY;
     
     // Click handler
@@ -43,9 +41,15 @@ export function createPausedOverlay(video, onPlaybackChange, playerWrapper, over
         if (onPlaybackChange) onPlaybackChange(isPaused);
     };
 
-    // Show/hide based on video state
+    // Show/hide based on video state: the center button must only be
+    // visible (and clickable) while the video is paused, otherwise it
+    // intercepts clicks meant for the video surface.
     function updateVisibility() {
-        playButton.innerHTML = video.paused ? ICONS.PLAY : ICONS.PAUSE;
+        const isPaused = video.paused;
+        playButton.innerHTML = isPaused ? ICONS.PLAY : ICONS.PAUSE;
+        playButton.style.opacity = isPaused ? '1' : '0';
+        playButton.style.pointerEvents = isPaused ? 'auto' : 'none';
+        overlay.classList.toggle('visible', isPaused);
     }
 
     // Video event listeners

@@ -31,7 +31,6 @@ let playerSettings = {
 // Global references
 let video = null;
 let engine = null;
-let controlsCleanup = null;
 
 // PostMessage communication with parent
 function sendMessage(type, data = {}) {
@@ -316,7 +315,7 @@ async function initializePeekPlayer() {
             }
         };
 
-        controlsCleanup = setupOverlayControls(video, container, {
+        setupOverlayControls(video, container, {
             callbacks,
             context: { player: engine, playerWrapper: wrapper },
             playerWrapper: wrapper,
@@ -342,8 +341,6 @@ async function initializePeekPlayer() {
 
         // Set up periodic state updates
         setInterval(updatePlayerState, 1000);
-
-        console.log('🎬 PeekPlayer initialized successfully');
 
     } catch (error) {
         console.error('🎬 PeekPlayer initialization failed:', error);

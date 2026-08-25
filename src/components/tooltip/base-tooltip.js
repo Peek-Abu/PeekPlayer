@@ -88,12 +88,6 @@ export function createTooltip(element, options = {}) {
         }
     }
     
-    function updateTooltipContent() {
-        if (tooltip && tooltip.classList.contains('tooltip--visible') && dynamic && getContent) {
-            tooltip.textContent = getContent();
-        }
-    }
-    
     // Event listeners
     element.addEventListener('mouseenter', showTooltip);
     element.addEventListener('mouseleave', hideTooltip);
@@ -108,11 +102,6 @@ export function createTooltip(element, options = {}) {
         element.removeEventListener('mouseleave', hideTooltip);
         element.removeEventListener('focus', showTooltip);
         element.removeEventListener('blur', hideTooltip);
-        
-        if (dynamic) {
-            element.removeEventListener('click', updateTooltipContent);
-            element.removeEventListener('change', updateTooltipContent);
-        }
 
         if (tooltip) {
             document.body.removeChild(tooltip);

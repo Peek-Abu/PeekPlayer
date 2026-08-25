@@ -22,10 +22,6 @@ export function assert(condition, message, context = {}) {
             error.message += ` [Method: ${context.method}]`;
         }
         
-        console.error('🚨 PeekPlayer Assertion Failed:', error.message);
-        console.error('Context:', context);
-        console.error('Stack:', error.stack);
-        
         throw error;
     }
 }

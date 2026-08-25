@@ -9,22 +9,11 @@ export function createQualitySelector(video, hooks = {}, logger, options = {}) {
     assertVideoElement(video, { component: 'QualitySelector', method: 'createQualitySelector' });
     assertExists(player, 'player', { component: 'QualitySelector', method: 'createQualitySelector' });
     
-    // Handle case where sourcesData is not yet available (during initialization)
-    const sourcesData = player.sourcesData;
-    if (!sourcesData) {
-        logger.log('🎬 Quality selector: sourcesData not available yet, creating placeholder');
-        // Return a hidden placeholder that will be updated later
-        const container = document.createElement('div');
-        container.className = 'quality-selector';
-        container.style.display = 'none'; // Hide until sources are loaded
-        
-        return {
-            element: container,
-            cleanup: () => {}
-        };
-    }
     const container = document.createElement('div');
     container.className = 'quality-selector';
+    // Hidden until sources arrive; updateSources() will reveal it.
+    container.style.display = 'none';
+
     const button = document.createElement('button');
     button.className = 'quality-button';
     button.style.pointerEvents = 'auto';
@@ -263,16 +252,28 @@ export function createQualitySelector(video, hooks = {}, logger, options = {}) {
         closeMenu();
     }
     
-    // Show notification
+    // Show notification (scoped to this player's wrapper so multiple
+    // player instances don't remove each other's notifications)
+    let spinKeyframesStyle = null;
+
+    function ensureSpinKeyframes() {
+        if (spinKeyframesStyle) {
+            return;
+        }
+        spinKeyframesStyle = document.createElement('style');
+        spinKeyframesStyle.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
+        document.head.appendChild(spinKeyframesStyle);
+    }
+
     function showNotification(message, type = 'info') {
-        // Remove existing notifications
-        const existing = document.querySelectorAll('.quality-notification');
-        existing.forEach(n => n.remove());
+        const wrapper = getPlayerWrapper() || document.body;
+        // Remove existing notifications belonging to this player
+        wrapper.querySelectorAll(':scope > .quality-notification').forEach((n) => n.remove());
         
         const notification = document.createElement('div');
         notification.className = 'quality-notification';
         notification.style.cssText = `
-            position: fixed;
+            position: absolute;
             top: 20px;
             right: 20px;
             background: ${type === 'loading' ? 'rgba(255, 193, 7, 0.9)' : 
@@ -290,20 +291,16 @@ export function createQualitySelector(video, hooks = {}, logger, options = {}) {
         `;
         
         if (type === 'loading') {
+            ensureSpinKeyframes();
             notification.innerHTML = `
                 <div style="width: 16px; height: 16px; border: 2px solid #fff; border-top: 2px solid transparent; border-radius: 50%; animation: spin 1s linear infinite;"></div>
                 ${message}
             `;
-            
-            // Add spin animation
-            const style = document.createElement('style');
-            style.textContent = '@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }';
-            document.head.appendChild(style);
         } else {
             notification.textContent = message;
         }
         
-        document.body.appendChild(notification);
+        wrapper.appendChild(notification);
         
         // Auto-remove after delay (longer for loading)
         const delay = type === 'loading' ? 5000 : 2000;
@@ -402,35 +399,31 @@ export function createQualitySelector(video, hooks = {}, logger, options = {}) {
     }
     
     // Event listeners
-    button.onclick = (e) => {
+    const handleButtonClick = (e) => {
         e.stopPropagation();
         toggleMenu();
     };
+    button.addEventListener('click', handleButtonClick);
 
     // Close menu when clicking outside
-    document.addEventListener('click', (e) => {
+    const handleDocumentClick = (e) => {
         if (!container.contains(e.target)) {
             closeMenu();
         }
-    });
+    };
+    document.addEventListener('click', handleDocumentClick);
 
     const onWindowResize = () => repositionMenu();
     if (typeof window !== 'undefined') {
         window.addEventListener('resize', onWindowResize);
     }
     
-    // Initialize with sources data
-    if (sourcesData && sourcesData.sources) {
-        buildQualityMenu(sourcesData.sources);
+    // Initialize with sources data if already available
+    const initialSourcesData = player.sourcesData;
+    if (initialSourcesData?.sources?.length) {
+        buildQualityMenu(initialSourcesData.sources);
     } else {
-        // Fallback for demo
-        logger.log('🎬 No sources provided, using demo qualities');
-        const demoQualities = [
-            { height: 1080, width: 1920, url: '', label: '1080p', isDub: false, index: 0 },
-            { height: 720, width: 1280, url: '', label: '720p', isDub: false, index: 1 },
-            { height: 480, width: 854, url: '', label: '480p', isDub: false, index: 2 }
-        ];
-        buildQualityMenu(demoQualities);
+        logger.log('🎬 Quality selector: no sources available yet, waiting for updateSources()');
     }
     // Assemble component
     container.appendChild(button);
@@ -451,19 +444,24 @@ export function createQualitySelector(video, hooks = {}, logger, options = {}) {
     
     // Return container and update method for external source changes
     container.updateSources = (newSourcesData) => {
-        if (newSourcesData && newSourcesData.sources) {
+        if (newSourcesData && Array.isArray(newSourcesData.sources) && newSourcesData.sources.length) {
             buildQualityMenu(newSourcesData.sources);
             currentQuality = 0; // Reset to first quality
             updateQualityDisplay();
-            notifyQualityChange(newSourcesData.sources[0]);
         }
     };
+    container.setActiveQuality = setActiveQuality;
 
     return { element: container, setActiveQuality, cleanup: () => {
         cleanupTooltip();
         if (typeof window !== 'undefined') {
             window.removeEventListener('resize', onWindowResize);
         }
-        button.removeEventListener('click', toggleMenu);
+        button.removeEventListener('click', handleButtonClick);
+        document.removeEventListener('click', handleDocumentClick);
+        if (spinKeyframesStyle && spinKeyframesStyle.parentNode) {
+            spinKeyframesStyle.parentNode.removeChild(spinKeyframesStyle);
+            spinKeyframesStyle = null;
+        }
     }};
 }

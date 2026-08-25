@@ -1,4 +1,4 @@
-export function createTimeDisplay(video, onTimeUpdate) {
+export function createTimeDisplay(video) {
     const timeContainer = document.createElement('div');
     timeContainer.className = 'time-display';
     timeContainer.style.pointerEvents = 'auto';
@@ -41,11 +41,6 @@ export function createTimeDisplay(video, onTimeUpdate) {
         
         currentTimeSpan.textContent = formatTime(currentTime);
         totalTimeSpan.textContent = formatTime(duration);
-        
-        // Call optional callback for external updates
-        if (onTimeUpdate) {
-            onTimeUpdate(currentTime, duration);
-        }
     }
     
     // Set up event listeners for time updates

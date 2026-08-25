@@ -1,3 +1,5 @@
+import { toggleFullscreen } from '../utils/fullscreen.js';
+
 export function setupVideoInteractions(video, playerWrapper, hooks = {}) {
     let clickTimeout = null;
     let lastClickTime = 0;
@@ -43,40 +45,22 @@ export function setupVideoInteractions(video, playerWrapper, hooks = {}) {
     
     function handleDoubleClick() {
         // Toggle fullscreen
-        if (!document.fullscreenElement) {
-            if (playerWrapper.requestFullscreen) {
-                playerWrapper.requestFullscreen();
-            } else if (playerWrapper.webkitRequestFullscreen) {
-                playerWrapper.webkitRequestFullscreen();
-            } else if (video.webkitEnterFullscreen) {
-                video.webkitEnterFullscreen();
-            } else if (playerWrapper.msRequestFullscreen) {
-                playerWrapper.msRequestFullscreen();
-            }
-        } else {
-            if (document.exitFullscreen) {
-                document.exitFullscreen();
-            } else if (document.webkitExitFullscreen) {
-                document.webkitExitFullscreen();
-            } else if (video.webkitExitFullscreen) {
-                video.webkitExitFullscreen();
-            } else if (document.msExitFullscreen) {
-                document.msExitFullscreen();
-            }
-        }
+        toggleFullscreen(playerWrapper, video, console);
     }
     
     // Add click listener to video
     video.addEventListener('click', handleVideoClick);
     
     // Prevent context menu on video for cleaner experience
-    video.addEventListener('contextmenu', (e) => {
+    const handleContextMenu = (e) => {
         e.preventDefault();
-    });
+    };
+    video.addEventListener('contextmenu', handleContextMenu);
     
     // Return cleanup function
     return () => {
         video.removeEventListener('click', handleVideoClick);
+        video.removeEventListener('contextmenu', handleContextMenu);
         if (clickTimeout) {
             clearTimeout(clickTimeout);
         }

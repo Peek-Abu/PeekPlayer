@@ -6,16 +6,34 @@ import { setupKeyboardControls } from '../features/keyboard-controls.js';
 import { setupAutoHideControls } from '../features/auto-hide-controls.js';
 import { setupMobileGestures } from '../features/mobile-gestures.js';
 import { assertVideoElement, assertElement, assertType } from '../utils/assert.js';
+import { getFullscreenElement } from '../utils/fullscreen.js';
+
+function createFallbackLogger() {
+  return {
+    debugEnabled: false,
+    setDebug(enabled) {
+      this.debugEnabled = !!enabled;
+    },
+    log(...args) {
+      if (this.debugEnabled) console.log(...args);
+    },
+    warn(...args) {
+      if (this.debugEnabled) console.warn(...args);
+    },
+    error(...args) {
+      console.error(...args);
+    }
+  };
+}
 
 export function setupOverlayControls(video, container, options = {}) {
   // Assert required parameters
   assertVideoElement(video, { component: 'Controls', method: 'setupOverlayControls' });
   assertElement(container, 'container', { component: 'Controls', method: 'setupOverlayControls' });
   assertType(options, 'object', 'options', { component: 'Controls', method: 'setupOverlayControls' });
-  assertType(options.logger, 'object', 'options.logger', { component: 'Controls', method: 'setupOverlayControls' });
   const {
     callbacks = {},
-    logger,
+    logger = createFallbackLogger(),
     controls: controlsConfig = {},
     context = {},
     nativeControlsForMobile = false,
@@ -96,7 +114,7 @@ export function setupOverlayControls(video, container, options = {}) {
 
     if (callbacks.onFullscreen) {
       const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
-      const handleFullscreenChange = () => callbacks.onFullscreen(!!document.fullscreenElement);
+      const handleFullscreenChange = () => callbacks.onFullscreen(!!getFullscreenElement());
       fullscreenEvents.forEach((evt) => addListener(document, evt, handleFullscreenChange));
     }
 
@@ -140,7 +158,6 @@ export function setupOverlayControls(video, container, options = {}) {
   const { element: scrubberBar, cleanup: scrubberCleanup } = createScrubberBar(video, callbacks.onSeek, options);
   const { element: controlRow, cleanup: controlRowCleanup, childElements } = createControlRow(video, { callbacks, controlConfig: controlsConfig, context: { ...context, playerWrapper: resolvedWrapper }, logger, isMobile });
   const { element: pausedOverlay, playPauseButton, cleanup: pausedOverlayCleanup } = createPausedOverlay(video, callbacks.onPlaybackChange, resolvedWrapper, overlayRoot);
-  
   // Assert control components were created successfully
   assertElement(scrubberBar, 'scrubberBar', { component: 'Controls', method: 'setupOverlayControls' });
   assertElement(controlRow, 'controlRow', { component: 'Controls', method: 'setupOverlayControls' });
@@ -175,12 +192,17 @@ export function setupOverlayControls(video, container, options = {}) {
         target.appendChild(element);
       }
     };
+    appendIfPresent(mobileTopLeft, assignedElements.pip);
     appendIfPresent(mobileTopRight, assignedElements.subtitles);
     appendIfPresent(mobileTopRight, assignedElements.quality);
-    appendIfPresent(mobileTopLeft, assignedElements.pip);
     appendIfPresent(mobileTopRight, assignedElements.volume);
 
+    appendIfPresent(mobileBottomLeft, assignedElements.playToggle);
+    appendIfPresent(mobileBottomLeft, assignedElements.skipPrevious);
+    appendIfPresent(mobileBottomLeft, assignedElements.skipNext);
     appendIfPresent(mobileBottomLeft, assignedElements.timeDisplay);
+    appendIfPresent(mobileBottomLeft, assignedElements.secondsSkipBack);
+    appendIfPresent(mobileBottomLeft, assignedElements.secondsSkipForward);
     appendIfPresent(mobileBottomRight, assignedElements.fullscreen);
 
     if (mobileTopLeft.childNodes.length) {
@@ -212,15 +234,25 @@ export function setupOverlayControls(video, container, options = {}) {
   const cleanupKeyboard = setupKeyboardControls(video, callbacks, resolvedWrapper, {
     cycleSubtitle: childElements.subtitles?.cycleSubtitle
   });
-  const cleanupAutoHide = setupAutoHideControls(video, [container, playPauseButton], resolvedWrapper);
-  const cleanupMobileGestures = setupMobileGestures(video, resolvedWrapper, context.player);
+  const cleanupAutoHide = setupAutoHideControls(video, [container, playPauseButton], resolvedWrapper, { isMobile });
+  const cleanupMobileGestures = setupMobileGestures(video, resolvedWrapper, logger);
   const fullscreenEvents = ['fullscreenchange', 'webkitfullscreenchange', 'mozfullscreenchange'];
   const handleFullscreenChange = () => {
     if (callbacks.onFullscreen) {
-      callbacks.onFullscreen(!!document.fullscreenElement);
+      callbacks.onFullscreen(!!getFullscreenElement());
     }
   };
   fullscreenEvents.forEach((evt) => document.addEventListener(evt, handleFullscreenChange));
+
+  // Report time updates independently of the time display component
+  let cleanupTimeUpdate = null;
+  if (typeof callbacks.onTimeUpdate === 'function') {
+    const handleTimeUpdate = () => {
+      callbacks.onTimeUpdate(video.currentTime || 0, video.duration || 0);
+    };
+    video.addEventListener('timeupdate', handleTimeUpdate);
+    cleanupTimeUpdate = () => video.removeEventListener('timeupdate', handleTimeUpdate);
+  }
   
   // Mobile-specific adjustments
   if (isMobile) {
@@ -233,6 +265,7 @@ export function setupOverlayControls(video, container, options = {}) {
     cleanupKeyboard();
     cleanupAutoHide();
     if (cleanupMobileGestures) cleanupMobileGestures();
+    if (cleanupTimeUpdate) cleanupTimeUpdate();
     scrubberCleanup();
     controlRowCleanup();
     pausedOverlayCleanup();

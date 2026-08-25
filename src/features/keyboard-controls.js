@@ -1,19 +1,36 @@
 import { TIMING } from '../constants/timing.js';
+import { toggleFullscreen as toggleFullscreenWithFallback } from '../utils/fullscreen.js';
 
 export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOptions = {}) {
     const VOLUME_STEP = 0.1;
     const { cycleSubtitle } = extraOptions;
     
     function handleKeyDown(e) {
-        // Only handle if video player area has focus or no input is focused
+        // Never hijack keys another component already handled (e.g. the scrubber)
+        if (e.defaultPrevented) return;
+
+        // Ignore held-down repeats (holding Space would rapidly toggle play/pause)
+        if (e.repeat) return;
+
         const activeElement = document.activeElement;
         const isInputFocused = activeElement && (
             activeElement.tagName === 'INPUT' || 
             activeElement.tagName === 'TEXTAREA' ||
-            activeElement.contentEditable === 'true'
+            activeElement.tagName === 'SELECT' ||
+            activeElement.isContentEditable === true
         );
         
         if (isInputFocused) return;
+
+        // Only respond when the player is actually the user's focus target:
+        // either something inside the wrapper has focus, or the pointer is
+        // over the player. This stops the handler from hijacking page-wide
+        // scrolling/keys while the player is off-screen or unrelated.
+        const wrapper = playerWrapper || video.closest('.peekplayer-wrapper');
+        if (!wrapper) return;
+        const wrapperHasFocus = activeElement && wrapper.contains(activeElement);
+        const wrapperIsHovered = typeof wrapper.matches === 'function' && wrapper.matches(':hover');
+        if (!wrapperHasFocus && !wrapperIsHovered) return;
         
         switch (e.code) {
             case 'Space':
@@ -74,14 +91,16 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
         const newTime = Math.max(0, video.currentTime - TIMING.SKIP_SECONDS);
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
-        if (hooks.onSeek) hooks.onSeek(newTime, delta, newTime / video.duration);
+        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        if (hooks.onSeek) hooks.onSeek(newTime, delta, percent);
     }
     
     function skipForward() {
-        const newTime = Math.min(video.duration || 0, video.currentTime + TIMING.SKIP_SECONDS);
+        const newTime = Math.min(Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER, video.currentTime + TIMING.SKIP_SECONDS);
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
-        if (hooks.onSeek) hooks.onSeek(newTime, delta, newTime / video.duration);
+        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        if (hooks.onSeek) hooks.onSeek(newTime, delta, percent);
     }
     
     function volumeUp() {
@@ -105,13 +124,7 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
     function toggleFullscreen() {
         const wrapper = playerWrapper || video.closest('.peekplayer-wrapper') || video.parentElement;
         if (!wrapper) return;
-        if (!document.fullscreenElement) {
-            if (wrapper.requestFullscreen) {
-                wrapper.requestFullscreen();
-            }
-        } else if (document.exitFullscreen) {
-            document.exitFullscreen();
-        }
+        toggleFullscreenWithFallback(wrapper, video);
     }
     
     // Add event listener

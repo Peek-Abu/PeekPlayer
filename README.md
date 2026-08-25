@@ -22,7 +22,7 @@ npm install @peekabu/peekplayer
 ## Usage
 
 ```html
-<link rel="stylesheet" href="node_modules/@peekabu/peekplayer/style.css">
+<link rel="stylesheet" href="node_modules/@peekabu/peekplayer/dist/peekplayer.css">
 
 <div class="peekplayer-example">
     <video class="peekplayer-example__video" preload="auto" crossorigin=""></video>
@@ -30,8 +30,8 @@ npm install @peekabu/peekplayer
     <div class="peekplayer-example__overlay"></div>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/hls.js@1.5.20/dist/hls.min.js"></script>
 <script src="node_modules/@peekabu/peekplayer/dist/peekplayer.js"></script>
+<!-- hls.js is bundled inside peekplayer.js — no separate hls.js script tag needed -->
 
 <script>
 const wrapper = document.querySelector('.peekplayer-example');

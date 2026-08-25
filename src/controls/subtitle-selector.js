@@ -142,7 +142,7 @@ export function createSubtitleSelector(video, hooks = {}, logger, options = {}) 
       index = 0;
     }
 
-    if (index === currentIndex && optionsList[index]?.track === (optionsList[currentIndex]?.track || null)) {
+    if (index === currentIndex) {
       closeMenu();
       return;
     }
@@ -207,9 +207,6 @@ export function createSubtitleSelector(video, hooks = {}, logger, options = {}) 
     updateMenuSelection();
     updateButtonState();
     updateVisibility();
-
-    const activeOption = optionsList[currentIndex] || OFF_OPTION;
-    notifySubtitleChange(activeOption);
   }
 
   function snapshotTracks() {

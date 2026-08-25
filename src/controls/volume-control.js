@@ -2,7 +2,7 @@ import { createTooltip, createVolumeTooltip } from '../components/tooltip/toolti
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { TIMING } from '../constants/timing.js';
-import { assertVideoElement, assertExists, assertFunction, assertRange } from '../utils/assert.js';
+import { assertVideoElement, assertFunction, assertRange } from '../utils/assert.js';
 
 export function createVolumeControl(video, onVolumeChange, options = {}) {
     // Assert required parameters
@@ -104,12 +104,13 @@ export function createVolumeControl(video, onVolumeChange, options = {}) {
     });
     
     // Update volume slider when video volume changes
-    video.addEventListener('volumechange', () => {
+    const handleVolumeChange = () => {
         // If muted, set slider to 0, otherwise use current volume
         slider.value = video.muted ? 0 : Math.round(video.volume * 100);
         updateVolumeProgress();
         updateMuteIcon();
-    });
+    };
+    video.addEventListener('volumechange', handleVolumeChange);
     
     // Initial icon update
     updateMuteIcon();
@@ -119,6 +120,11 @@ export function createVolumeControl(video, onVolumeChange, options = {}) {
         container.appendChild(volumeSlider);
     }
     return { element: container, cleanup: () => {
+        video.removeEventListener('volumechange', handleVolumeChange);
+        if (hoverTimeout) {
+            clearTimeout(hoverTimeout);
+            hoverTimeout = null;
+        }
         container.remove();
         muteTooltip();
         volumeTooltip();

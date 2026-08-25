@@ -20,14 +20,11 @@ jobs:
           node-version: '18'
           registry-url: 'https://registry.npmjs.org'
 
-      - name: Install dependencies
+      - name: Install dependencies (runs `prepare` → build)
         run: npm ci
 
-      - name: Build package
-        run: npm run build
-
-      - name: Run tests (if any)
-        run: npm test --if-present
+      - name: Smoke test
+        run: npm test
 
       - name: Publish to NPM (on release)
         if: github.event_name == 'release'

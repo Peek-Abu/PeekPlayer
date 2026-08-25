@@ -8,23 +8,39 @@ export function createPlayButton(video, onPlaybackChange, options = {}) {
     btn.className = 'play-toggle-button';
     btn.style.pointerEvents = 'auto';
     btn.innerHTML = video.paused ? ICONS.PLAY : ICONS.PAUSE;
-    btn.onclick = (e) => {
+
+    const handleClick = (e) => {
         e.stopPropagation();
         if (video.paused) {
-        video.play();
+            video.play();
         } else {
-        video.pause();
+            video.pause();
         }
         btn.innerHTML = video.paused ? ICONS.PLAY : ICONS.PAUSE;
         if (onPlaybackChange) onPlaybackChange(!video.paused);
     };
 
-    video.onplay = () => { btn.innerHTML = ICONS.PAUSE; };
-    video.onpause = () => { btn.innerHTML = ICONS.PLAY; };
+    // Use addEventListener (instead of onplay/onpause assignment) so we never
+    // clobber handlers the host page or other components registered.
+    const handlePlay = () => { btn.innerHTML = ICONS.PAUSE; };
+    const handlePause = () => { btn.innerHTML = ICONS.PLAY; };
+
+    btn.addEventListener('click', handleClick);
+    video.addEventListener('play', handlePlay);
+    video.addEventListener('pause', handlePause);
+
     const cleanupTooltip = createTooltip(btn, {
         ...TOOLTIP_CONFIG.DYNAMIC_FAST,
         getContent: () => video.paused ? 'Play' : 'Pause',
         isMobile: options.isMobile
     });
-    return { element: btn, cleanup: cleanupTooltip };
+    return {
+        element: btn,
+        cleanup: () => {
+            btn.removeEventListener('click', handleClick);
+            video.removeEventListener('play', handlePlay);
+            video.removeEventListener('pause', handlePause);
+            cleanupTooltip();
+        }
+    };
 }

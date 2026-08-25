@@ -51,19 +51,32 @@ function normalizeSegments(segments = []) {
 }
 
 // Engine selection logic
-function selectVideoEngine(options = {}, sources = [], logger = DEFAULT_LOGGER) {
+function selectVideoEngine(options = {}, sources = [], logger = DEFAULT_LOGGER, url = '') {
   if (options.engine) return options.engine;
   
-  const forceHLS = new URLSearchParams(window.location.search).get('engine') === 'hls';
+  const forceHLS = typeof window !== 'undefined'
+    && new URLSearchParams(window.location.search).get('engine') === 'hls';
   
   if (forceHLS) return 'hls';
   
-  // Auto-detect based on source URLs
-  if (sources.length > 0) {
-    const firstUrl = sources[0].url.toLowerCase();
-    if (firstUrl.includes('.m3u8') || firstUrl.includes('hls')) {
+  // Auto-detect based on the direct URL and source URLs
+  const candidateUrls = [];
+  if (typeof url === 'string' && url) {
+    candidateUrls.push(url);
+  }
+  if (sources.length > 0 && typeof sources[0]?.url === 'string') {
+    candidateUrls.push(sources[0].url);
+  }
+  
+  for (const candidateUrl of candidateUrls) {
+    const lowerUrl = candidateUrl.toLowerCase();
+    if (lowerUrl.includes('.m3u8') || lowerUrl.includes('hls')) {
       return 'hls';
     }
+  }
+  
+  if (sources.length > 0) {
+    const firstUrl = (sources[0].url || '').toLowerCase();
     if (firstUrl.includes('.mp4') || firstUrl.includes('.webm') || firstUrl.includes('.ogg')) {
       return 'native';
     }
@@ -78,7 +91,7 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
   assertExists(url, 'url', { component: 'Player', method: 'initializeVideoEngine' });
   assertType(url, 'string', 'url', { component: 'Player', method: 'initializeVideoEngine' });
   
-  const engineType = selectVideoEngine(options, sources, logger);
+  const engineType = selectVideoEngine(options, sources, logger, url);
   logger.log(`🎬 Selected engine: ${engineType}`);
   
   let engine;
@@ -697,7 +710,6 @@ export class PeekPlayer {
 
     if (typeof partialOptions.segmentAutoSkip !== 'undefined') {
       this.options.segmentAutoSkip = partialOptions.segmentAutoSkip;
-      console.log(this.options.segmentAutoSkip);
       shouldRefreshControls = true;
     }
 

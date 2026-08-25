@@ -20,6 +20,7 @@ export const TIMING = {
   DOUBLE_TAP_THRESHOLD: 500,
   SWIPE_THRESHOLD: 50,
   SWIPE_VERTICAL_LIMIT: 100,
+  SWIPE_PIXEL_TO_SECOND_RATIO: 10,
   
   // Skip amounts (in seconds)
   SKIP_SECONDS: 10,

@@ -341,21 +341,20 @@ export function createSegmentedScrubber(options = {}) {
     }
   }
 
-  function updateFromPointer(event) {
+  // During a drag we only update the visual preview; hammering
+  // video.currentTime on every pointermove causes constant seeking/hitches.
+  // The actual seek is committed once on pointer-down (tap-to-seek) and once
+  // on release.
+  function updateFromPointerPreview(event) {
     if (duration <= 0) return;
     const rect = track.getBoundingClientRect();
     if (!rect.width) return;
 
     const percent = clamp((event.clientX - rect.left) / rect.width, 0, 1);
-    const nextTime = percent * duration;
-    const previous = currentTime;
-    currentTime = nextTime;
+    currentTime = percent * duration;
     updateVisualState();
-    if (onSeek) {
-      onSeek(nextTime, nextTime - previous, percent);
-    }
 
-    const hoverIndex = findSegmentIndexAtTime(nextTime);
+    const hoverIndex = findSegmentIndexAtTime(currentTime);
     setHoveredSegment(hoverIndex);
   }
 
@@ -367,7 +366,18 @@ export function createSegmentedScrubber(options = {}) {
     isScrubbing = true;
     root.classList.add('segmented-scrubber--scrubbing');
     root.setPointerCapture(event.pointerId);
-    updateFromPointer(event);
+    // Tap-to-seek: commit immediately on press
+    seekToFromPointer(event);
+  }
+
+  function seekToFromPointer(event) {
+    if (duration <= 0) return;
+    const rect = track.getBoundingClientRect();
+    if (!rect.width) return;
+    const percent = clamp((event.clientX - rect.left) / rect.width, 0, 1);
+    seekTo(percent * duration);
+    const hoverIndex = findSegmentIndexAtTime(currentTime);
+    setHoveredSegment(hoverIndex);
   }
 
   function handlePointerMove(event) {
@@ -382,7 +392,7 @@ export function createSegmentedScrubber(options = {}) {
     }
 
     if (isScrubbing) {
-      updateFromPointer(event);
+      updateFromPointerPreview(event);
     }
   }
 
@@ -392,7 +402,8 @@ export function createSegmentedScrubber(options = {}) {
       root.releasePointerCapture(event.pointerId);
     }
     if (event) {
-      updateFromPointer(event);
+      // Commit the final seek position on release
+      seekToFromPointer(event);
     }
     isScrubbing = false;
     root.classList.remove('segmented-scrubber--scrubbing');

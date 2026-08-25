@@ -1,6 +1,7 @@
 import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
+import { getFullscreenElement } from '../utils/fullscreen.js';
 
 export function createFullscreenButton(playerWrapper, onFullscreen, video, logger, options = {}) {
   const btn = document.createElement('button');
@@ -23,9 +24,11 @@ export function createFullscreenButton(playerWrapper, onFullscreen, video, logge
       logger?.warn?.('Fullscreen button: no wrapper available');
       return;
     }
-    if (document.fullscreenElement) {
+    if (getFullscreenElement()) {
       if (document.exitFullscreen) {
-        document.exitFullscreen();
+        document.exitFullscreen().catch?.((err) => {
+          logger?.error?.('Fullscreen exit failed:', err);
+        });
       } else if (video.webkitExitFullscreen) {
         video.webkitExitFullscreen();
       } else if (document.msExitFullscreen) {
@@ -37,13 +40,14 @@ export function createFullscreenButton(playerWrapper, onFullscreen, video, logge
           logger?.error?.('Fullscreen request failed:', err);
         });
       } else if (video.webkitEnterFullscreen) {
-        video.webkitEnterFullscreen().catch((err) => {
+        // iOS Safari: returns undefined (not a promise), must not call .catch()
+        try {
+          video.webkitEnterFullscreen();
+        } catch (err) {
           logger?.error?.('Fullscreen request failed:', err);
-        });
+        }
       } else if (wrapper.msRequestFullscreen) {
-        wrapper.msRequestFullscreen().catch((err) => {
-          logger?.error?.('Fullscreen request failed:', err);
-        });
+        wrapper.msRequestFullscreen();
       }
     }
   };
@@ -52,7 +56,7 @@ export function createFullscreenButton(playerWrapper, onFullscreen, video, logge
   fullscreenEvents.forEach((evt) => document.addEventListener(evt, handleFullscreenChange));
   const cleanupTooltip = createTooltip(btn, {
     ...TOOLTIP_CONFIG.DYNAMIC_FAST,
-    getContent: () => document.fullscreenElement ? 'Exit Fullscreen' : 'Fullscreen',
+    getContent: () => getFullscreenElement() ? 'Exit Fullscreen' : 'Fullscreen',
     isMobile: options.isMobile
   });
   return { element: btn, cleanup: () => {

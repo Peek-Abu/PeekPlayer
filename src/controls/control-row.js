@@ -85,7 +85,7 @@ export function createControlRow(video, options = {}) {
         leftClusterAdded = true;
     }
     if (controlsConfig.timeDisplay) {
-        const { element, cleanup } = createTimeDisplay(video, callbacks.onTimeUpdate);
+        const { element, cleanup } = createTimeDisplay(video);
         cleanups.push(cleanup);
         appendElement(element);
         childElements.timeDisplay = element;

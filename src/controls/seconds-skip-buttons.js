@@ -32,20 +32,23 @@ export function createSecondsSkipButtons(video, onSeek, options = {}) {
     skipForwardBtn.innerHTML = ICONS.SKIP_FORWARD_10;
     
     // Event handlers
+    const seekWithGuard = (targetTime) => {
+        const newTime = Math.max(0, targetTime);
+        const delta = newTime - video.currentTime;
+        video.currentTime = newTime;
+        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        if (onSeek) onSeek(newTime, delta, percent);
+    };
+
     skipBackBtn.onclick = (e) => {
         e.stopPropagation();
-        const newTime = Math.max(0, video.currentTime - TIMING.SKIP_SECONDS);
-        const delta = newTime - video.currentTime
-        video.currentTime = newTime;
-        if (onSeek) onSeek(newTime, delta, newTime / video.duration);
+        seekWithGuard(video.currentTime - TIMING.SKIP_SECONDS);
     };
     
     skipForwardBtn.onclick = (e) => {
         e.stopPropagation();
-        const newTime = Math.min(video.duration || 0, video.currentTime + TIMING.SKIP_SECONDS);
-        const delta = newTime - video.currentTime
-        video.currentTime = newTime;
-        if (onSeek) onSeek(newTime, delta, newTime / video.duration);
+        const maxTime = Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER;
+        seekWithGuard(Math.min(maxTime, video.currentTime + TIMING.SKIP_SECONDS));
     };
     
     return {
