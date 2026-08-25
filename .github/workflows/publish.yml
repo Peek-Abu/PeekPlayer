@@ -1,11 +1,16 @@
 name: Publish to NPM
 
+# Publishing happens ONLY on a GitHub Release. Creating a release also
+# creates its tag, so a separate `v*` tag trigger would fire a second
+# (failing) publish run. Pushes/PRs are gated by ci.yml instead.
+
 on:
-  push:
-    branches: [ main ]
-    tags: [ 'v*' ]
   release:
     types: [ published ]
+
+concurrency:
+  group: npm-publish
+  cancel-in-progress: false
 
 jobs:
   publish:
@@ -17,7 +22,7 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '18'
+          node-version: '20'
           registry-url: 'https://registry.npmjs.org'
 
       - name: Install dependencies (runs `prepare` → build)
@@ -26,14 +31,7 @@ jobs:
       - name: Smoke test
         run: npm test
 
-      - name: Publish to NPM (on release)
-        if: github.event_name == 'release'
-        run: npm publish --access public
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-
-      - name: Publish to NPM (on version tag)
-        if: startsWith(github.ref, 'refs/tags/v')
+      - name: Publish to NPM
         run: npm publish --access public
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
