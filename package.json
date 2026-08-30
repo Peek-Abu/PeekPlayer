@@ -46,11 +46,11 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/peek-abu/PeekPlayer"
+    "url": "https://github.com/Peek-Abu/PeekPlayer"
   },
-  "homepage": "https://github.com/peek-abu/PeekPlayer#readme",
+  "homepage": "https://github.com/Peek-Abu/PeekPlayer#readme",
   "bugs": {
-    "url": "https://github.com/peek-abu/PeekPlayer/issues"
+    "url": "https://github.com/Peek-Abu/PeekPlayer/issues"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
