@@ -63,6 +63,10 @@
         } from '../dist/peekplayer.esm.js';
 
         const params = new URLSearchParams(location.search);
+        // A genuinely live 24/7 stream, chosen because it plays from a browser
+        // origin. Several broadcaster CDNs (NASA's among them) serve their HLS
+        // happily to curl but answer 403 to a cross-origin browser request, so
+        // "reachable" is not the same as "usable in a page".
         const SRC = params.get('src')
             || 'https://demo.unified-streaming.com/k8s/live/stable/live.isml/.m3u8';
 

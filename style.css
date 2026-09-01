@@ -732,10 +732,9 @@ button:focus {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 3px 9px;
+  padding: 3px 4px;
   margin-left: 6px;
-  border: 1px solid transparent;
-  border-radius: 3px;
+  border: 0;
   background: transparent;
   color: #fff;
   font: 600 11px/1 system-ui, -apple-system, sans-serif;
@@ -762,17 +761,21 @@ button:focus {
   animation: peekplayer-live-pulse 2s ease-in-out infinite;
 }
 
-/* Behind the edge: actionable. */
+/* Behind the edge: actionable. No outline — the dimmed dot and the changed
+   label already say it, and a bordered pill sat oddly among controls that are
+   all borderless. */
 .live-badge.is-behind {
   cursor: pointer;
-  border-color: rgba(255, 255, 255, 0.35);
-  color: rgba(255, 255, 255, 0.85);
+  color: rgba(255, 255, 255, 0.7);
 }
 
 .live-badge.is-behind:hover,
 .live-badge.is-behind:focus-visible {
-  border-color: #ff3d3d;
   color: #fff;
+}
+
+.live-badge.is-behind:hover .live-badge-dot {
+  background: #ff3d3d;
 }
 
 .live-badge:disabled {
