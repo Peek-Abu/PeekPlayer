@@ -15,7 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Live edge falls back to `buffered` when `seekable` is unavailable — before the first append, or on an engine that leaves it empty.
   - The scrubber prefers the DVR window the manifest advertises (via `LEVEL_LOADED`) over `buffered`, which only covers what has been downloaded and understates a live window badly.
   - `examples/live-example.html` — a live demo with a raw media-state readout, `?src=` override, and `?simulate=1` for working offline.
-  - Exported helpers: `isLiveVideo`, `liveEdge`, `liveStart`, `dvrWindow`, `behindLiveBy`, `isAtLiveEdge`, `seekToLiveEdge`.
+  - Seeks are clamped to what the source can serve. The skip buttons and keyboard clamped forward seeks to `MAX_SAFE_INTEGER` and backward to `0`; on a live stream that means far past the end of the broadcast, or before the DVR window begins. Both stall.
+  - The scrubber tooltip reads distance from the live edge. It computed `percent * video.duration`, which is `Infinity` on live — every position formatted to "0:00" — and assumed the bar spans `0..duration` rather than a window that neither starts at zero nor stays put.
+  - The time display keeps counting while paused. `timeupdate` only fires during playback, but a paused viewer keeps falling behind a live edge that moves regardless; it was observed frozen at "-0:04" while the real gap had passed forty seconds.
+  - The scrubber announces distance from live to assistive tech instead of elapsed window seconds.
+  - Exported helpers: `isLiveVideo`, `liveEdge`, `liveStart`, `dvrWindow`, `behindLiveBy`, `isAtLiveEdge`, `seekToLiveEdge`, `liveWindow`, `clampSeek`.
 - Frame-by-frame stepping: `,` steps back, `.` steps forward (auto-pauses); configurable via the new `frameRate` option (default 30fps)
 - Mouse-wheel volume control over the volume button/slider (5% steps)
 - Live time-display preview while scrubbing (shows the target time before the seek is committed on release)

@@ -128,3 +128,75 @@ export function seekToLiveEdge(video, safetyGap = 1) {
   video.currentTime = Math.max(start, edge - safetyGap);
   return true;
 }
+
+/**
+ * DVR window as reported by the engine, per video element.
+ *
+ * hls.js knows the window the manifest advertises; `buffered` only covers what
+ * has been downloaded, which understates it badly. Kept here rather than in
+ * one control so the scrubber, its tooltip and the keyboard all agree on where
+ * the seekable region begins.
+ */
+const engineDvrWindows = new WeakMap();
+
+/**
+ * Record the manifest's DVR window for this element.
+ *
+ * @param {HTMLVideoElement} video
+ * @param {number} seconds
+ */
+export function noteEngineDvrWindow(video, seconds) {
+  if (!video) return;
+  engineDvrWindows.set(video, Number.isFinite(seconds) && seconds > 0 ? seconds : 0);
+}
+
+/**
+ * The span of media a viewer can actually move around in.
+ *
+ * VOD is the whole file, starting at zero. Live is the DVR window, which does
+ * not start at zero and moves forward as the broadcast continues — so times
+ * have to be mapped into and out of it rather than used directly.
+ *
+ * @param {HTMLVideoElement} video
+ * @returns {{ offset: number, length: number, live: boolean }}
+ */
+export function liveWindow(video) {
+  if (!isLiveVideo(video)) {
+    const duration = Number.isFinite(video?.duration) ? video.duration : 0;
+    return { offset: 0, length: duration, live: false };
+  }
+  const end = liveEdge(video);
+  if (end === null) return { offset: 0, length: 0, live: true };
+
+  const bufferedStart = liveStart(video) ?? end;
+  const fromEngine = engineDvrWindows.get(video) || 0;
+  const start = fromEngine > (end - bufferedStart)
+    ? Math.max(0, end - fromEngine)
+    : bufferedStart;
+  return { offset: start, length: Math.max(0, end - start), live: true };
+}
+
+/**
+ * Keep a seek inside what the source can actually serve.
+ *
+ * On live that is the DVR window: seeking past the edge lands in a segment
+ * that does not exist yet and stalls, and seeking before the window start
+ * lands in one that has already been rolled off. Both were reachable — the
+ * skip buttons and the keyboard clamped forward seeks to MAX_SAFE_INTEGER,
+ * which on a live stream means "far past the end of the broadcast".
+ *
+ * @param {HTMLVideoElement} video
+ * @param {number} seconds desired position, in absolute media time
+ * @returns {number} a position that is safe to assign to currentTime
+ */
+export function clampSeek(video, seconds) {
+  const { offset, length, live } = liveWindow(video);
+  if (!Number.isFinite(seconds)) return video?.currentTime || 0;
+  if (!live) {
+    const duration = Number.isFinite(video?.duration) ? video.duration : 0;
+    return duration > 0 ? Math.min(Math.max(0, seconds), duration) : Math.max(0, seconds);
+  }
+  // Stay a beat behind the edge: the newest segment is still being written.
+  const latest = Math.max(offset, offset + length - 1);
+  return Math.min(Math.max(offset, seconds), latest);
+}

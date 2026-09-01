@@ -42,6 +42,21 @@ function formatTime(seconds) {
 
 export function createSegmentedScrubber(options = {}) {
   const { onSeek, getSegments, segmentGap, onScrubPreview, onScrubStart, onScrubEnd } = options;
+  /**
+   * How a position is announced to assistive tech.
+   *
+   * Overridable because the bar does not always represent elapsed time: on a
+   * live stream it spans a DVR window, where "10:01" says nothing useful and
+   * distance from the live edge is the meaningful reading.
+   */
+  const describeOverride = typeof options.describePosition === 'function'
+    ? options.describePosition
+    : null;
+  /** A describer returning nothing falls back to plain elapsed time. */
+  const describePosition = (time, total) => {
+    const described = describeOverride ? describeOverride(time, total) : null;
+    return typeof described === 'string' && described ? described : formatTime(time);
+  };
   const segmentHooksOption = options.segmentHooks ?? {};
 
   if (onSeek) {
@@ -325,7 +340,7 @@ export function createSegmentedScrubber(options = {}) {
 
     root.setAttribute('aria-valuemax', duration > 0 ? `${Math.round(duration)}` : '0');
     root.setAttribute('aria-valuenow', `${Math.round(currentTime)}`);
-    root.setAttribute('aria-valuetext', formatTime(currentTime));
+    root.setAttribute('aria-valuetext', describePosition(currentTime, duration));
 
     updateSegmentStates();
     highlightActiveSegment();

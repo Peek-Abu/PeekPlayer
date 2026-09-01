@@ -1,7 +1,7 @@
 import { createScrubberTooltip } from '../components/tooltip/tooltip.js';
 import { createSegmentedScrubber } from './segmented-scrubber.js';
 import { assertVideoElement, assertFunction } from '../utils/assert.js';
-import { isLiveVideo, liveStart, liveEdge } from '../utils/live.js';
+import { liveWindow, noteEngineDvrWindow } from '../utils/live.js';
 
 /**
  * Below this much rewind a live stream gets no scrubber at all.
@@ -45,28 +45,15 @@ export function createScrubberBar(video, onSeek, options = {}) {
      * seekable. hls.js will fetch older segments on a seek outside the
      * buffer, so the manifest's window is the honest one.
      */
-    let engineDvrWindow = 0;
+    // Recorded against the element so the tooltip and keyboard resolve the
+    // same window this bar is drawing.
     const handleLiveState = (event) => {
-        const value = event?.detail?.dvrWindow;
-        engineDvrWindow = Number.isFinite(value) ? value : 0;
+        noteEngineDvrWindow(video, event?.detail?.dvrWindow);
         updateScrubber();
     };
     video.addEventListener('peekplayer:live-state', handleLiveState);
 
-    const timelineWindow = () => {
-        if (!isLiveVideo(video)) {
-            const duration = Number.isFinite(video.duration) ? video.duration : 0;
-            return { offset: 0, length: duration, live: false };
-        }
-        const end = liveEdge(video);
-        if (end === null) return { offset: 0, length: 0, live: true };
-        const bufferedStart = liveStart(video) ?? end;
-        // Whichever window is larger is the one actually seekable.
-        const start = engineDvrWindow > (end - bufferedStart)
-            ? Math.max(0, end - engineDvrWindow)
-            : bufferedStart;
-        return { offset: start, length: Math.max(0, end - start), live: true };
-    };
+    const timelineWindow = () => liveWindow(video);
 
     const segmentedScrubber = createSegmentedScrubber({
         getSegments,
@@ -74,6 +61,12 @@ export function createScrubberBar(video, onSeek, options = {}) {
             // `time` is window-relative; the video wants absolute media time.
             video.currentTime = timelineWindow().offset + time;
             if (onSeek) onSeek(video.currentTime, delta, percent);
+        },
+        describePosition: (windowTime, windowLength) => {
+            const { live } = liveWindow(video);
+            if (!live) return null;
+            const behind = Math.max(0, windowLength - windowTime);
+            return behind < 1 ? 'Live' : `${Math.round(behind)} seconds behind live`;
         },
         onScrubPreview: typeof options.onScrubPreview === 'function' ? options.onScrubPreview : null,
         onScrubStart: typeof options.onScrubStart === 'function' ? options.onScrubStart : null,
@@ -100,8 +93,9 @@ export function createScrubberBar(video, onSeek, options = {}) {
     interactiveElement.addEventListener('mouseleave', handleHoverLeave);
 
     const getBufferedEnd = () => {
-        if (isLiveVideo(video)) {
-            const { offset, length } = timelineWindow();
+        const window = timelineWindow();
+        if (window.live) {
+            const { offset, length } = window;
             if (!video.buffered?.length) return 0;
             let maxEnd = 0;
             for (let i = 0; i < video.buffered.length; i++) {

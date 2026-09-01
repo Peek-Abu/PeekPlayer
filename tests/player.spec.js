@@ -295,4 +295,90 @@ test.describe('live streams', () => {
     expect(percent).toBeGreaterThan(250);
     expect(percent).toBeLessThan(350);
   });
+  test('a forward skip stops at the live edge', async ({ page }) => {
+    // Forward used to clamp to MAX_SAFE_INTEGER, which on a live stream means
+    // far past the end of the broadcast — the seek lands in a segment that
+    // does not exist yet and playback stalls.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 600, currentTime: 595 });
+    await page.locator('.skip-forward').click();
+    const time = await page.evaluate(() => window.player.video.currentTime);
+    expect(time).toBeGreaterThan(595);
+    expect(time).toBeLessThanOrEqual(600);
+  });
+
+  test('a backward skip stops at the start of the DVR window', async ({ page }) => {
+    // Backward clamped to 0, which is before a live window begins — those
+    // segments have already rolled off the playlist.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 600, currentTime: 305 });
+    await page.locator('.skip-back').click();
+    const time = await page.evaluate(() => window.player.video.currentTime);
+    expect(time).toBeGreaterThanOrEqual(300);
+    expect(time).toBeLessThan(305);
+  });
+
+  test('clampSeek keeps VOD behaviour unchanged', async ({ page }) => {
+    await openPlayer(page);
+    const result = await page.evaluate(() => {
+      const v = window.player.video;
+      return {
+        past: window.PeekPlayerLive.clampSeek(v, v.duration + 999),
+        before: window.PeekPlayerLive.clampSeek(v, -50),
+        duration: v.duration
+      };
+    });
+    expect(result.past).toBeCloseTo(result.duration, 3);
+    expect(result.before).toBe(0);
+  });
+
+  test('the scrubber announces distance from live, not elapsed seconds', async ({ page }) => {
+    // "10:01" tells a screen-reader user nothing on a rolling window.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 800 });
+    const text = await page.getAttribute('.segmented-scrubber', 'aria-valuetext');
+    expect(text).toMatch(/behind live|^Live$/);
+  });
+
+  test('the time display keeps counting while paused on a live stream', async ({ page }) => {
+    // The edge advances whether or not the viewer is playing, so a paused
+    // reading goes stale — observed sitting at "-0:04" while the real gap had
+    // grown past forty seconds.
+    await openPlayer(page);
+    await makeLive(page, { start: 0, end: 600, currentTime: 590 });
+    const before = await page.locator('.time-display .current-time').textContent();
+
+    // Move the edge without emitting timeupdate, exactly as a paused live
+    // stream does while it keeps buffering.
+    await page.evaluate(() => {
+      const video = window.player.video;
+      Object.defineProperty(video, 'seekable', {
+        configurable: true,
+        get: () => ({ length: 1, start: () => 0, end: () => 660 })
+      });
+    });
+    await page.waitForTimeout(1500);
+    const after = await page.locator('.time-display .current-time').textContent();
+    expect(after).not.toBe(before);
+  });
+  test('the scrubber tooltip reads distance from live, not Infinity', async ({ page }) => {
+    // The tooltip computed `percent * video.duration`, and a live stream's
+    // duration is Infinity — every position produced Infinity, which the
+    // formatter swallowed into "0:00". It also assumed the bar spans
+    // 0..duration, wrong for a window that neither starts at zero nor stays put.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 800 });
+
+    const bar = page.locator('.segmented-scrubber');
+    const box = await bar.boundingBox();
+    // Halfway along the bar: 300s into a 600s window, so 300s behind the edge.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.move(box.x + box.width / 2 + 2, box.y + box.height / 2);
+
+    const time = page.locator('.tooltip--scrubber .tooltip__time');
+    await expect(time).toBeVisible();
+    const text = await time.textContent();
+    expect(text).not.toBe('0:00');
+    expect(text).toMatch(/^(-\d+:\d{2}|LIVE)$/);
+  });
 });

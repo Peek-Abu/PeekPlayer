@@ -1,4 +1,5 @@
 import { TIMING } from '../../constants/timing.js';
+import { liveWindow } from '../../utils/live.js';
 
 export function createScrubberTooltip(scrubber, video, options = {}) {
     let hoverTime = null;
@@ -21,11 +22,36 @@ export function createScrubberTooltip(scrubber, video, options = {}) {
         return `${mins}:${secs.toString().padStart(2, '0')}`;
     }
     
+    /**
+     * Absolute media time under the cursor.
+     *
+     * Resolved through the same window the bar is drawing. On a live stream
+     * `video.duration` is Infinity, so the old `percent * video.duration` gave
+     * Infinity for every position and the tooltip read as nonsense; it also
+     * treated the bar as spanning 0..duration, which is wrong for a DVR window
+     * that neither starts at zero nor stays put.
+     */
     function getTimeAtPosition(e) {
         const rect = scrubber.getBoundingClientRect();
         const percent = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
-        const time = percent * video.duration;
-        return Math.max(0, Math.min(time, video.duration));
+        const { offset, length } = liveWindow(video);
+        if (!(length > 0)) return null;
+        return offset + percent * length;
+    }
+
+    /**
+     * What to print for a position.
+     *
+     * Live has no meaningful elapsed time — a viewer does not care that they
+     * are 412 seconds into a rolling window — so it shows distance from the
+     * live edge instead, which is the thing that means something.
+     */
+    function labelForTime(time) {
+        if (time === null) return '';
+        const { offset, length, live } = liveWindow(video);
+        if (!live) return formatTime(time);
+        const behind = Math.max(0, (offset + length) - time);
+        return behind < 1 ? 'LIVE' : `-${formatTime(behind)}`;
     }
     
     function createTooltipElement() {
@@ -66,7 +92,7 @@ export function createScrubberTooltip(scrubber, video, options = {}) {
         }
 
         if (timeElement) {
-            timeElement.textContent = formatTime(time);
+            timeElement.textContent = labelForTime(time);
         }
         
         if (thumbnailElement && thumbnailData) {

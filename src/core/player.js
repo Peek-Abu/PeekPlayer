@@ -863,5 +863,7 @@ export {
   behindLiveBy,
   isAtLiveEdge,
   seekToLiveEdge,
+  clampSeek,
+  liveWindow,
   LIVE_EDGE_TOLERANCE
 } from '../utils/live.js';

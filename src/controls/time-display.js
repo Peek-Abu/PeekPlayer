@@ -70,6 +70,22 @@ export function createTimeDisplay(video) {
     video.addEventListener('loadedmetadata', updateTimeDisplay);
     video.addEventListener('durationchange', updateTimeDisplay);
     video.addEventListener('seeked', handleSeeked);
+    // The live edge advances whether or not the video is playing, so `buffered`
+    // growing changes how far behind the viewer is.
+    video.addEventListener('progress', updateTimeDisplay);
+
+    /**
+     * On a live stream the reading goes stale the moment playback stops.
+     *
+     * `timeupdate` only fires while playing, but a paused viewer keeps falling
+     * further behind the edge every second — observed sitting at "-0:04" while
+     * the real gap had grown past forty seconds. A one-second tick keeps it
+     * honest, and does nothing on VOD, where a paused position genuinely does
+     * not change.
+     */
+    const liveTick = setInterval(() => {
+        if (isLiveVideo(video) && !scrubbing) updateTimeDisplay();
+    }, 1000);
     
     // Initial update
     updateTimeDisplay();
@@ -96,6 +112,8 @@ export function createTimeDisplay(video) {
     }
 
     return { element: timeContainer, cleanup: () => {
+        clearInterval(liveTick);
+        video.removeEventListener('progress', updateTimeDisplay);
         video.removeEventListener('timeupdate', updateTimeDisplay);
         video.removeEventListener('loadedmetadata', updateTimeDisplay);
         video.removeEventListener('durationchange', updateTimeDisplay);

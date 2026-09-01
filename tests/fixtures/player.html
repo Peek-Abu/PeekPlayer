@@ -15,10 +15,10 @@
   <div id="controls"></div>
 </div>
 <script type="module">
-  import PeekPlayer, { dvrWindow, liveEdge, isLiveVideo, isAtLiveEdge, behindLiveBy } from '../../dist/peekplayer.esm.js';
+  import PeekPlayer, { dvrWindow, liveEdge, isLiveVideo, isAtLiveEdge, behindLiveBy, clampSeek, liveWindow } from '../../dist/peekplayer.esm.js';
   // Exposed for the live tests, and doubles as a check that the helpers are
   // actually reachable from the built bundle.
-  window.PeekPlayerLive = { dvrWindow, liveEdge, isLiveVideo, isAtLiveEdge, behindLiveBy };
+  window.PeekPlayerLive = { dvrWindow, liveEdge, isLiveVideo, isAtLiveEdge, behindLiveBy, clampSeek, liveWindow };
   window.__events = [];
   window.player = new PeekPlayer({
     videoElement: document.getElementById('video'),

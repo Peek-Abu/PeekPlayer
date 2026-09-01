@@ -1,4 +1,5 @@
 import { TIMING } from '../constants/timing.js';
+import { clampSeek } from '../utils/live.js';
 import { toggleFullscreen as toggleFullscreenWithFallback } from '../utils/fullscreen.js';
 
 export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOptions = {}) {
@@ -96,8 +97,7 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
             if (hooks.onPlaybackChange) hooks.onPlaybackChange(false);
         }
         const frameSeconds = 1 / (extraOptions.frameRate || TIMING.DEFAULT_FRAME_RATE);
-        const duration = Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER;
-        const newTime = Math.min(duration, Math.max(0, video.currentTime + count * frameSeconds));
+        const newTime = clampSeek(video, video.currentTime + count * frameSeconds);
         if (newTime === video.currentTime) {
             return;
         }
@@ -118,7 +118,7 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
     }
     
     function skipBackward() {
-        const newTime = Math.max(0, video.currentTime - TIMING.SKIP_SECONDS);
+        const newTime = clampSeek(video, video.currentTime - TIMING.SKIP_SECONDS);
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
         const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
@@ -126,7 +126,7 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
     }
     
     function skipForward() {
-        const newTime = Math.min(Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER, video.currentTime + TIMING.SKIP_SECONDS);
+        const newTime = clampSeek(video, video.currentTime + TIMING.SKIP_SECONDS);
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
         const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
