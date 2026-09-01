@@ -12,7 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A `LIVE` badge with a pulsing red dot at the live edge, which becomes a `GO LIVE` button when the viewer falls behind; clicking it returns to the edge (landing just short of it, since seeking exactly to the edge stalls). Disable with `controls: { liveBadge: false }`; `onSeekToLive(behindBy)` reports the jump.
   - The scrubber now represents the DVR window rather than the whole timeline. Live `currentTime` sits inside an absolute `[start, edge]` range, so positions are mapped into and out of that window; previously `currentTime / Infinity` pinned the thumb at zero. Streams offering under 30s of rewind get no bar at all.
   - The time display drops the meaningless total (`Infinity` formatted as `0:00`) and shows how far behind the edge the viewer is.
-  - Live edge falls back to `buffered` when `seekable` is unusable. Measured against a real MSE live stream `seekable` stayed empty for the whole session, which reported a zero DVR window and hid the scrubber on a stream with minutes of rewind.
+  - Live edge falls back to `buffered` when `seekable` is unavailable — before the first append, or on an engine that leaves it empty.
+  - The scrubber prefers the DVR window the manifest advertises (via `LEVEL_LOADED`) over `buffered`, which only covers what has been downloaded and understates a live window badly.
   - `examples/live-example.html` — a live demo with a raw media-state readout, `?src=` override, and `?simulate=1` for working offline.
   - Exported helpers: `isLiveVideo`, `liveEdge`, `liveStart`, `dvrWindow`, `behindLiveBy`, `isAtLiveEdge`, `seekToLiveEdge`.
 - Frame-by-frame stepping: `,` steps back, `.` steps forward (auto-pauses); configurable via the new `frameRate` option (default 30fps)
@@ -21,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - CI: Playwright browser UI suite (13 tests) running in a new `e2e` job, npm provenance on publish, Dependabot, PR template
 
 ### Fixed
+- **hls.js never ran; every HLS source went down the native path.** `player.js` passed `useNativeIfSupported: options.engine !== 'hls'`, which is true for every caller that does not name an engine. Chromium answers `"maybe"` for `application/vnd.apple.mpegurl` despite having no native HLS, so the video element was handed a text playlist and playback died with `DEMUXER_ERROR_COULD_NOT_PARSE`. Native is now used only when the caller asks for `engine: 'native'`, or when hls.js genuinely cannot run (iOS Safari). This also restored quality levels, `seekable`, and the DVR window, none of which the native path produced.
 - **Fatal HLS errors ended playback permanently.** The error handler only logged. Fatal network errors now call `startLoad()` and fatal media errors `recoverMediaError()`, which matters most on live streams: a dropped segment or a mid-stream rendition change would otherwise lose the broadcast for good. Genuinely unrecoverable errors emit `peekplayer:fatal-error`.
 - The scrubber ignored `durationchange`, so a source that turned out to be live kept whatever geometry it had when metadata first loaded.
 - `.scrubber-row` sets `display: flex`, which overrode the user-agent `[hidden]` rule — hiding the row from JS did nothing until the explicit `[hidden]` rule was added.

@@ -36,13 +36,35 @@ export function createScrubberBar(video, onSeek, options = {}) {
      * rather than passed through. Without this, live playback sat at a
      * position of `currentTime / Infinity`, i.e. pinned at the far left.
      */
+    /**
+     * The DVR window the manifest advertises, when hls.js has told us.
+     *
+     * Preferred over `buffered`, which only covers what has been downloaded —
+     * on a stream advertising several minutes of rewind that read as fifteen
+     * seconds, so the bar stayed hidden on streams that were perfectly
+     * seekable. hls.js will fetch older segments on a seek outside the
+     * buffer, so the manifest's window is the honest one.
+     */
+    let engineDvrWindow = 0;
+    const handleLiveState = (event) => {
+        const value = event?.detail?.dvrWindow;
+        engineDvrWindow = Number.isFinite(value) ? value : 0;
+        updateScrubber();
+    };
+    video.addEventListener('peekplayer:live-state', handleLiveState);
+
     const timelineWindow = () => {
         if (!isLiveVideo(video)) {
             const duration = Number.isFinite(video.duration) ? video.duration : 0;
             return { offset: 0, length: duration, live: false };
         }
-        const start = liveStart(video) ?? 0;
-        const end = liveEdge(video) ?? start;
+        const end = liveEdge(video);
+        if (end === null) return { offset: 0, length: 0, live: true };
+        const bufferedStart = liveStart(video) ?? end;
+        // Whichever window is larger is the one actually seekable.
+        const start = engineDvrWindow > (end - bufferedStart)
+            ? Math.max(0, end - engineDvrWindow)
+            : bufferedStart;
         return { offset: start, length: Math.max(0, end - start), live: true };
     };
 
@@ -189,6 +211,7 @@ export function createScrubberBar(video, onSeek, options = {}) {
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('seeked', handleSeeked);
         video.removeEventListener('durationchange', handleDurationChange);
+        video.removeEventListener('peekplayer:live-state', handleLiveState);
     };
 
     function resetAutoSkipState() {

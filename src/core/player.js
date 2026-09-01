@@ -98,7 +98,13 @@ async function initializeVideoEngine(video, url, options = {}, sources = [], log
   switch (engineType) {
     case 'hls':
       engine = new HLSWrapper(video, options.hlsConfig, logger, {
-        useNativeIfSupported: options.engine !== 'hls'
+        // Only when the caller explicitly asks for native. This used to read
+        // `options.engine !== 'hls'`, which is true for every caller that does
+        // not name an engine — so the default path forced native HLS, and in
+        // Chromium (which claims "maybe" for the HLS MIME type but cannot play
+        // it) that meant handing the video element a text playlist. Playback
+        // died with DEMUXER_ERROR_COULD_NOT_PARSE and hls.js never ran at all.
+        useNativeIfSupported: options.engine === 'native'
       });
       break;
     case 'native':

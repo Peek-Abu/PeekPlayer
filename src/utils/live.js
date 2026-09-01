@@ -46,12 +46,12 @@ function edgeOf(ranges, which) {
 /**
  * The furthest point currently available, or null when nothing is known yet.
  *
- * `seekable` is the correct source and is tried first, but it is not dependable
- * on live streams: measured against a real MSE live stream it stayed empty for
- * the whole session, and some browsers report `[0, Infinity]` once the media
- * source duration is infinite. Either way the DVR window looked like zero and
- * the scrubber hid itself on a stream that had several minutes of rewind.
- * `buffered` is the fallback — narrower than the true window, but real.
+ * `seekable` is the correct source and is what a working MSE live stream
+ * reports, so it is tried first. `buffered` backs it up for the cases where it
+ * is genuinely unavailable — before the first append, and on engines that
+ * leave it empty. The fallback is narrower than the true DVR window, so it can
+ * understate how much rewind exists; that is the right way round, since it can
+ * only ever hide a scrubber rather than offer a seek that does not work.
  *
  * @param {HTMLVideoElement} video
  * @returns {number | null}

@@ -8,21 +8,33 @@ export class HLSWrapper {
     this.sourcesData = null;
     this.hlsConfig = hlsConfig;
     this.logger = logger;
-    this.useNativeIfSupported = options.useNativeIfSupported !== undefined ? options.useNativeIfSupported : true;
+    // Opt-in, not the default. See initialize() for why.
+    this.useNativeIfSupported = options.useNativeIfSupported === true;
   }
 
   async initialize(hlsUrl) {
     this.logger.log('🎬 Initializing HLS Engine', hlsUrl);
 
-    // Check if browser supports HLS natively (Safari/iOS)
-    if (this.useNativeIfSupported && this.video.canPlayType('application/vnd.apple.mpegurl')) {
+    const hlsJsUsable = !!Hls && typeof Hls.isSupported === 'function' && Hls.isSupported();
+
+    /**
+     * Native HLS, for browsers that genuinely have it — iOS Safari above all,
+     * where MSE is absent and hls.js cannot run.
+     *
+     * `canPlayType` alone is not enough to decide this. Chromium answers
+     * "maybe" for application/vnd.apple.mpegurl despite having no native HLS,
+     * so preferring native on a truthy answer handed Chrome a text playlist as
+     * `video.src` and playback died with DEMUXER_ERROR_COULD_NOT_PARSE. hls.js
+     * therefore wins wherever it can run, and native is the fallback — the
+     * order hls.js's own documentation recommends.
+     */
+    if ((!hlsJsUsable || this.useNativeIfSupported) && this.video.canPlayType('application/vnd.apple.mpegurl')) {
       this.logger.log('🎬 Using native HLS support');
       this.video.src = hlsUrl;
       return this;
     }
 
-    // Use HLS.js for other browsers
-    if (Hls && typeof Hls.isSupported === 'function' && Hls.isSupported()) {
+    if (hlsJsUsable) {
       const defaultConfig = {
         enableWorker: true,
         lowLatencyMode: false,

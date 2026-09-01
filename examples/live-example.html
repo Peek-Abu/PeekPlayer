@@ -30,6 +30,7 @@
         Defaults to a public live HLS stream. Override with <code>?src=&lt;m3u8&gt;</code>.
         Use <code>?simulate=1</code> to fake a live source from a local file — no network needed,
         useful when the demo stream is down or you are offline.
+        Starts muted, because browsers only autoplay muted video — click the player to unmute.
     </p>
 
     <div class="peekplayer-wrapper">
@@ -50,6 +51,9 @@
         <div class="row"><span>raw video.duration</span><span id="r-dur">—</span></div>
         <div class="row"><span>raw seekable</span><span id="r-seek">—</span></div>
         <div class="row"><span>raw buffered</span><span id="r-buf">—</span></div>
+        <div class="row"><span>engine live-state event</span><span id="r-evt">never fired</span></div>
+        <div class="row"><span>engine hls-levels event</span><span id="r-lvl">never fired</span></div>
+        <div class="row"><span>engine</span><span id="r-eng">—</span></div>
     </div>
 
     <script type="module">
@@ -89,10 +93,23 @@
             controlsContainer: wrapper.querySelector('.peekplayer-controls'),
             overlayContainer: wrapper.querySelector('.peekplayer-overlay'),
             playerWrapper: wrapper,
+            autoplay: true,
+            autoUnmuteOnInteraction: true,
             onSeekToLive: (behindBy) => {
                 document.getElementById('s-jump').textContent =
                     `jumped forward ${behindBy.toFixed(1)}s`;
             }
+        });
+
+        // The engine's own view, which is authoritative when hls.js is driving.
+        video.addEventListener('peekplayer:live-state', (e) => {
+            const d = e.detail || {};
+            document.getElementById('r-evt').textContent =
+                `isLive=${d.isLive} dvrWindow=${Number(d.dvrWindow).toFixed(1)}s target=${d.targetDuration}`;
+        });
+
+        video.addEventListener('peekplayer:hls-levels', (e) => {
+            document.getElementById('r-lvl').textContent = `${(e.detail?.sources || []).length} levels`;
         });
 
         const fmt = (n) => Number.isFinite(n) ? `${n.toFixed(1)}s` : '—';
@@ -118,6 +135,9 @@
             document.getElementById('r-buf').textContent = bf && bf.length
                 ? `len=${bf.length} ${bf.start(0).toFixed(1)} → ${bf.end(bf.length - 1).toFixed(1)}`
                 : 'empty';
+            const eng = window.player?.engine;
+            document.getElementById('r-eng').textContent =
+                eng ? `${eng.constructor?.name || 'unknown'} hls=${!!eng.hls}` : 'none';
             const row = wrapper.querySelector('.scrubber-row');
             document.getElementById('s-scrub').textContent =
                 row ? (row.hidden ? 'hidden (no DVR)' : 'visible') : '—';
@@ -131,6 +151,12 @@
             } else {
                 await player.loadSources([{ url: SRC, quality: 'Auto' }]);
             }
+            // Browsers only allow autoplay when muted; the page says so, and
+            // the first click unmutes. Waiting for `canplay` matters: calling
+            // play() straight after loadSources runs before hls.js has
+            // appended anything, and the attempt is simply dropped.
+            video.muted = true;
+            video.addEventListener('canplay', () => video.play().catch(() => {}), { once: true });
             refresh();
         } catch (error) {
             console.error('Failed to initialize PeekPlayer:', error);
