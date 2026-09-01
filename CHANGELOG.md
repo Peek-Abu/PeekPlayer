@@ -8,12 +8,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Added
+- **Live stream support.** Live sources are detected from an infinite `duration`, so it works for hls.js and native HLS alike:
+  - A `LIVE` badge with a pulsing red dot at the live edge, which becomes a `GO LIVE` button when the viewer falls behind; clicking it returns to the edge (landing just short of it, since seeking exactly to the edge stalls). Disable with `controls: { liveBadge: false }`; `onSeekToLive(behindBy)` reports the jump.
+  - The scrubber now represents the DVR window rather than the whole timeline. Live `currentTime` sits inside an absolute `[start, edge]` range, so positions are mapped into and out of that window; previously `currentTime / Infinity` pinned the thumb at zero. Streams offering under 30s of rewind get no bar at all.
+  - The time display drops the meaningless total (`Infinity` formatted as `0:00`) and shows how far behind the edge the viewer is.
+  - Exported helpers: `isLiveVideo`, `liveEdge`, `liveStart`, `dvrWindow`, `behindLiveBy`, `isAtLiveEdge`, `seekToLiveEdge`.
 - Frame-by-frame stepping: `,` steps back, `.` steps forward (auto-pauses); configurable via the new `frameRate` option (default 30fps)
 - Mouse-wheel volume control over the volume button/slider (5% steps)
 - Live time-display preview while scrubbing (shows the target time before the seek is committed on release)
 - CI: Playwright browser UI suite (13 tests) running in a new `e2e` job, npm provenance on publish, Dependabot, PR template
 
 ### Fixed
+- **Fatal HLS errors ended playback permanently.** The error handler only logged. Fatal network errors now call `startLoad()` and fatal media errors `recoverMediaError()`, which matters most on live streams: a dropped segment or a mid-stream rendition change would otherwise lose the broadcast for good. Genuinely unrecoverable errors emit `peekplayer:fatal-error`.
+- The scrubber ignored `durationchange`, so a source that turned out to be live kept whatever geometry it had when metadata first loaded.
+- `.scrubber-row` sets `display: flex`, which overrode the user-agent `[hidden]` rule — hiding the row from JS did nothing until the explicit `[hidden]` rule was added.
 - **CommonJS entry was broken**: `require('@peekabu/peekplayer')` returned an empty object because the UMD bundle was parsed as ESM (`"type": "module"`). The CJS build is now emitted as `dist/peekplayer.cjs` and wired into the exports map.
 - **HLS engine was never selected by `loadSource(url)`**: engine detection only inspected the (initially empty) sources array, so `.m3u8` URLs bypassed hls.js — quality levels and subtitles never appeared. The URL argument is now checked.
 - **Quality selector never appeared** when HLS levels arrived after initialization (placeholder component did not expose `updateSources`).

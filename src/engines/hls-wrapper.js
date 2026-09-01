@@ -38,6 +38,11 @@ export class HLSWrapper {
         // Audio codec handling
         audioCodecSwitch: true,
         forceKeyFrameOnDiscontinuity: true,
+        // Live tuning. lowLatencyMode stays off by default — it is a real
+        // win on streams that publish partial segments and a source of
+        // stalling on the many that do not. Callers opt in via hlsConfig.
+        liveSyncDurationCount: 3,
+        liveDurationInfinity: true,
         // Debug mode
         debug: false,
         // Handle encrypted streams better
@@ -109,8 +114,43 @@ export class HLSWrapper {
         }));
       });
 
+      // A live level tells us the stream is live and how much rewind it
+      // offers. Dispatched rather than returned because the controls are built
+      // before the manifest is parsed.
+      this.hls.on(Hls.Events.LEVEL_LOADED, (_event, data) => {
+        const details = data?.details;
+        if (!details) return;
+        this.video.dispatchEvent(new CustomEvent('peekplayer:live-state', {
+          detail: {
+            isLive: !!details.live,
+            dvrWindow: Number.isFinite(details.totalduration) ? details.totalduration : 0,
+            targetDuration: details.targetduration || 0
+          }
+        }));
+      });
+
       this.hls.on(Hls.Events.ERROR, (event, data) => {
         this.logger.error('🎬 HLS Error:', data);
+        if (!data?.fatal) return;
+
+        // Live streams drop segments routinely — a flaky origin, a mid-stream
+        // rendition change, a network blip. Without recovery a single fatal
+        // error ends playback for good, which on a live stream means the
+        // viewer has simply lost the broadcast.
+        switch (data.type) {
+          case Hls.ErrorTypes.NETWORK_ERROR:
+            this.logger.warn('🎬 Fatal network error, restarting load');
+            this.hls.startLoad();
+            break;
+          case Hls.ErrorTypes.MEDIA_ERROR:
+            this.logger.warn('🎬 Fatal media error, recovering');
+            this.hls.recoverMediaError();
+            break;
+          default:
+            this.logger.error('🎬 Unrecoverable HLS error');
+            this.video.dispatchEvent(new CustomEvent('peekplayer:fatal-error', { detail: data }));
+            break;
+        }
       });
       this.hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_evt, data) => {
         this.logger.log('🎬 Subtitle tracks updated:', data);

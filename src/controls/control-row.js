@@ -7,6 +7,7 @@ import { createSecondsSkipButtons } from './seconds-skip-buttons.js';
 import { createQualitySelector } from './quality-selector.js';
 import { createSubtitleSelector } from './subtitle-selector.js';
 import { createPipButton } from './pip-button.js';
+import { createLiveBadge } from './live-badge.js';
 
 export function createControlRow(video, options = {}) {
     const controlRow = document.createElement('div');
@@ -29,7 +30,8 @@ export function createControlRow(video, options = {}) {
         quality: true,
         subtitles: true,
         pip: true,
-        fullscreen: true
+        fullscreen: true,
+        liveBadge: true
     };
     const controlsConfig = { ...defaultConfig, ...incomingConfig };
     const cleanups = [];
@@ -89,6 +91,17 @@ export function createControlRow(video, options = {}) {
         cleanups.push(cleanup);
         appendElement(element);
         childElements.timeDisplay = element;
+        leftClusterAdded = true;
+    }
+    if (controlsConfig.liveBadge) {
+        // Hides itself on non-live sources, so it is safe to always build.
+        const { element, cleanup } = createLiveBadge(video, {
+            onSeekToLive: callbacks.onSeekToLive,
+            logger
+        });
+        cleanups.push(cleanup);
+        appendElement(element);
+        childElements.liveBadge = element;
         leftClusterAdded = true;
     }
     const applyAutoMargin = leftClusterAdded;

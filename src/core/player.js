@@ -844,3 +844,17 @@ export class PeekPlayer {
 
 // Export for UMD builds
 export default PeekPlayer;
+
+// Live helpers are part of the public surface: a host page often needs to know
+// whether a source is live before it decides what chrome to render around the
+// player, and it should not have to duplicate the detection.
+export {
+  isLiveVideo,
+  liveEdge,
+  liveStart,
+  dvrWindow,
+  behindLiveBy,
+  isAtLiveEdge,
+  seekToLiveEdge,
+  LIVE_EDGE_TOLERANCE
+} from '../utils/live.js';

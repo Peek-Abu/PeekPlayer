@@ -1,6 +1,15 @@
 import { createScrubberTooltip } from '../components/tooltip/tooltip.js';
 import { createSegmentedScrubber } from './segmented-scrubber.js';
 import { assertVideoElement, assertFunction } from '../utils/assert.js';
+import { isLiveVideo, liveStart, liveEdge } from '../utils/live.js';
+
+/**
+ * Below this much rewind a live stream gets no scrubber at all.
+ *
+ * A bar representing eight seconds of DVR cannot be dragged anywhere useful,
+ * and drawing one invites viewers to try.
+ */
+const MIN_DVR_SECONDS = 30;
 
 export function createScrubberBar(video, onSeek, options = {}) {
     // Assert required parameters
@@ -19,11 +28,30 @@ export function createScrubberBar(video, onSeek, options = {}) {
     const getSegments = () => options.segments || [];
     const segmentGap = typeof options.segmentGap === 'number' ? options.segmentGap : 0.17;
 
+    /**
+     * The window the scrubber represents.
+     *
+     * VOD is the whole file. Live is the DVR window, which both moves forward
+     * and does not start at zero — so times are shifted into and out of it
+     * rather than passed through. Without this, live playback sat at a
+     * position of `currentTime / Infinity`, i.e. pinned at the far left.
+     */
+    const timelineWindow = () => {
+        if (!isLiveVideo(video)) {
+            const duration = Number.isFinite(video.duration) ? video.duration : 0;
+            return { offset: 0, length: duration, live: false };
+        }
+        const start = liveStart(video) ?? 0;
+        const end = liveEdge(video) ?? start;
+        return { offset: start, length: Math.max(0, end - start), live: true };
+    };
+
     const segmentedScrubber = createSegmentedScrubber({
         getSegments,
         onSeek: (time, delta, percent) => {
-            video.currentTime = time;
-            if (onSeek) onSeek(time, delta, percent);
+            // `time` is window-relative; the video wants absolute media time.
+            video.currentTime = timelineWindow().offset + time;
+            if (onSeek) onSeek(video.currentTime, delta, percent);
         },
         onScrubPreview: typeof options.onScrubPreview === 'function' ? options.onScrubPreview : null,
         onScrubStart: typeof options.onScrubStart === 'function' ? options.onScrubStart : null,
@@ -50,6 +78,16 @@ export function createScrubberBar(video, onSeek, options = {}) {
     interactiveElement.addEventListener('mouseleave', handleHoverLeave);
 
     const getBufferedEnd = () => {
+        if (isLiveVideo(video)) {
+            const { offset, length } = timelineWindow();
+            if (!video.buffered?.length) return 0;
+            let maxEnd = 0;
+            for (let i = 0; i < video.buffered.length; i++) {
+                const end = video.buffered.end(i);
+                if (end > maxEnd) maxEnd = end;
+            }
+            return Math.min(Math.max(0, maxEnd - offset), length);
+        }
         if (!video.duration || !video.buffered?.length) return 0;
         let maxEnd = 0;
         for (let i = 0; i < video.buffered.length; i++) {
@@ -62,9 +100,18 @@ export function createScrubberBar(video, onSeek, options = {}) {
     };
 
     const updateScrubber = () => {
+        const { offset, length, live } = timelineWindow();
+
+        // A live stream with no meaningful rewind gets no bar.
+        if (live && length < MIN_DVR_SECONDS) {
+            bar.hidden = true;
+            return;
+        }
+        bar.hidden = false;
+
         segmentedScrubber.update({
-            currentTime: video.currentTime || 0,
-            duration: video.duration || 0,
+            currentTime: Math.max(0, (video.currentTime || 0) - offset),
+            duration: length,
             bufferedEnd: getBufferedEnd()
         });
         maybeAutoSkip(video.currentTime || 0);
@@ -109,6 +156,10 @@ export function createScrubberBar(video, onSeek, options = {}) {
         updateScrubber();
     };
 
+    const handleDurationChange = () => {
+        updateScrubber();
+    };
+
     const handleSeeked = () => {
         updateScrubber();
     };
@@ -118,6 +169,10 @@ export function createScrubberBar(video, onSeek, options = {}) {
     video.addEventListener('progress', handleProgress);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('seeked', handleSeeked);
+    // A source turning out to be live only shows up as a duration change —
+    // Infinity replacing a finite value. Without this the bar kept whatever
+    // geometry it had when the metadata first loaded.
+    video.addEventListener('durationchange', handleDurationChange);
 
     const cleanup = () => {
         if (animationFrame) {
@@ -133,6 +188,7 @@ export function createScrubberBar(video, onSeek, options = {}) {
         video.removeEventListener('progress', handleProgress);
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('seeked', handleSeeked);
+        video.removeEventListener('durationchange', handleDurationChange);
     };
 
     function resetAutoSkipState() {

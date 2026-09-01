@@ -39,6 +39,8 @@ export interface PlayerControlsConfig {
   quality?: boolean;
   subtitles?: boolean;
   pip?: boolean;
+  /** LIVE indicator / jump-to-edge button. Hides itself on non-live sources. */
+  liveBadge?: boolean;
   fullscreen?: boolean;
 }
 
@@ -66,6 +68,8 @@ export interface PlayerCallbacks {
   onSeek?(time: number, delta: number, percent: number): void;
   onVolumeChange?(volume: number): void;
   onFullscreen?(isFullscreen: boolean): void;
+  /** Fired when the viewer jumps back to the live edge. `behindBy` is how far behind they were, in seconds. */
+  onSeekToLive?(behindBy: number): void;
   /** Fired independently of the time display component */
   onTimeUpdate?(currentTime: number, duration: number): void;
   /** 'previous' | 'next' from skip buttons, or autoNext on video end */
@@ -146,3 +150,16 @@ export declare class PeekPlayer {
 }
 
 export default PeekPlayer;
+
+/**
+ * Live-stream helpers. Every one reads the video element, so they work for
+ * hls.js, native HLS and plain live sources alike.
+ */
+export declare function isLiveVideo(video: HTMLVideoElement): boolean;
+export declare function liveEdge(video: HTMLVideoElement): number | null;
+export declare function liveStart(video: HTMLVideoElement): number | null;
+export declare function dvrWindow(video: HTMLVideoElement): number;
+export declare function behindLiveBy(video: HTMLVideoElement): number;
+export declare function isAtLiveEdge(video: HTMLVideoElement, tolerance?: number): boolean;
+export declare function seekToLiveEdge(video: HTMLVideoElement, safetyGap?: number): boolean;
+export declare const LIVE_EDGE_TOLERANCE: number;

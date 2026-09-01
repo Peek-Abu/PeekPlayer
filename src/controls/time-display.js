@@ -1,3 +1,5 @@
+import { isLiveVideo, behindLiveBy } from '../utils/live.js';
+
 export function createTimeDisplay(video) {
     // While a scrub drag is active, timeupdate/seeked events carry the stale
     // playback position and must not overwrite the previewed position.
@@ -43,8 +45,22 @@ export function createTimeDisplay(video) {
             return;
         }
         const currentTime = video.currentTime || 0;
+
+        // A live stream has no total: duration is Infinity, which formatted as
+        // "0:00" and made every live stream look like an empty file. Show how
+        // far behind the edge the viewer is instead, which is the number that
+        // actually means something, and nothing at all when they are on it.
+        if (isLiveVideo(video)) {
+            const behind = Math.round(behindLiveBy(video));
+            currentTimeSpan.textContent = behind > 0 ? `-${formatTime(behind)}` : formatTime(currentTime);
+            separator.hidden = true;
+            totalTimeSpan.hidden = true;
+            return;
+        }
+
+        separator.hidden = false;
+        totalTimeSpan.hidden = false;
         const duration = video.duration || 0;
-        
         currentTimeSpan.textContent = formatTime(currentTime);
         totalTimeSpan.textContent = formatTime(duration);
     }

@@ -179,3 +179,93 @@ test.describe('keyboard', () => {
     await page.waitForFunction(() => window.player.video.paused);
   });
 });
+
+test.describe('live streams', () => {
+  /**
+   * Present the loaded fixture as a live stream.
+   *
+   * A real live source would mean a network dependency, which this suite
+   * deliberately avoids. What the player actually reads is `duration` and
+   * `seekable`, so overriding those exercises every code path that matters:
+   * `Infinity` duration is what marks a stream live, and the seekable range is
+   * the DVR window the scrubber and badge are built from.
+   */
+  async function makeLive(page, { start = 0, end = 600, currentTime = 595 } = {}) {
+    await page.evaluate(({ start, end, currentTime }) => {
+      const video = window.player.video;
+      Object.defineProperty(video, 'duration', { configurable: true, get: () => Infinity });
+      Object.defineProperty(video, 'seekable', {
+        configurable: true,
+        get: () => ({ length: 1, start: () => start, end: () => end })
+      });
+      let time = currentTime;
+      Object.defineProperty(video, 'currentTime', {
+        configurable: true,
+        get: () => time,
+        set: (v) => { time = v; video.dispatchEvent(new Event('seeked')); }
+      });
+      video.dispatchEvent(new Event('durationchange'));
+      video.dispatchEvent(new Event('timeupdate'));
+    }, { start, end, currentTime });
+  }
+
+  test('badge is hidden for a normal file', async ({ page }) => {
+    await openPlayer(page);
+    await expect(page.locator('.live-badge')).toBeHidden();
+  });
+
+  test('shows LIVE at the edge, and does not offer a jump', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { end: 600, currentTime: 597 });
+    const badge = page.locator('.live-badge');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText(/LIVE/);
+    await expect(badge).toHaveClass(/is-at-edge/);
+    await expect(badge).toBeDisabled();
+  });
+
+  test('offers GO LIVE when behind, and clicking returns to the edge', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { end: 600, currentTime: 400 });
+    const badge = page.locator('.live-badge');
+    await expect(badge).toHaveClass(/is-behind/);
+    await expect(badge).toHaveText(/GO LIVE/);
+    await expect(badge).toBeEnabled();
+
+    await badge.click();
+
+    // Lands just behind the edge on purpose: seeking exactly to it stalls.
+    const time = await page.evaluate(() => window.player.video.currentTime);
+    expect(time).toBeGreaterThan(595);
+    expect(time).toBeLessThanOrEqual(600);
+    await expect(badge).toHaveClass(/is-at-edge/);
+  });
+
+  test('time display drops the total and reports how far behind', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { end: 600, currentTime: 540 });
+    await expect(page.locator('.time-display .total-time')).toBeHidden();
+    // 60s behind the edge.
+    await expect(page.locator('.time-display .current-time')).toHaveText('-1:00');
+  });
+
+  test('scrubber is hidden when the stream offers no rewind', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { start: 592, end: 600, currentTime: 599 });
+    await expect(page.locator('.scrubber-row')).toBeHidden();
+  });
+
+  test('scrubber maps position into the DVR window, not absolute time', async ({ page }) => {
+    await openPlayer(page);
+    // Halfway through a 600s window that starts at 300.
+    await makeLive(page, { start: 300, end: 900, currentTime: 600 });
+    await expect(page.locator('.scrubber-row')).toBeVisible();
+    const percent = await page.evaluate(() => {
+      const el = document.querySelector('.segmented-scrubber');
+      return Number(el.getAttribute('aria-valuenow'));
+    });
+    // Absolute time would read 600; window-relative is 300 of 600.
+    expect(percent).toBeGreaterThan(250);
+    expect(percent).toBeLessThan(350);
+  });
+});
