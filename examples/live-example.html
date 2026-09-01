@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PeekPlayer - Live Example</title>
+    <link rel="stylesheet" href="../dist/peekplayer.css">
+    <style>
+        body { margin: 0; padding: 24px; background: #0d0d10; color: #e8e8ec;
+               font: 14px/1.5 system-ui, -apple-system, sans-serif; }
+        h1 { font-size: 18px; margin: 0 0 4px; }
+        .hint { color: #8a8a95; font-size: 13px; margin: 0 0 18px; }
+        .peekplayer-wrapper { max-width: 900px; background: #000; }
+        .panel { max-width: 900px; margin-top: 18px; border: 1px solid #26262f;
+                 background: #131318; padding: 14px 16px; }
+        .panel h2 { font-size: 12px; text-transform: uppercase; letter-spacing: .1em;
+                    color: #8a8a95; margin: 0 0 10px; }
+        .row { display: flex; justify-content: space-between; padding: 3px 0;
+               border-bottom: 1px solid #1d1d25; font-variant-numeric: tabular-nums; }
+        .row:last-child { border-bottom: 0; }
+        .row span:last-child { color: #a99cff; }
+        .yes { color: #4fb783 !important; }
+        .no { color: #ff6b7d !important; }
+        code { background: #1d1d25; padding: 1px 5px; border-radius: 3px; font-size: 12px; }
+    </style>
+</head>
+<body>
+    <h1>PeekPlayer — live stream</h1>
+    <p class="hint">
+        Defaults to a public live HLS stream. Override with <code>?src=&lt;m3u8&gt;</code>.
+        Use <code>?simulate=1</code> to fake a live source from a local file — no network needed,
+        useful when the demo stream is down or you are offline.
+    </p>
+
+    <div class="peekplayer-wrapper">
+        <video class="peekplayer-video" playsinline webkit-playsinline preload="auto" crossorigin=""></video>
+        <div class="peekplayer-controls"></div>
+        <div class="peekplayer-overlay"></div>
+    </div>
+
+    <div class="panel">
+        <h2>Live state</h2>
+        <div class="row"><span>isLiveVideo()</span><span id="s-live">—</span></div>
+        <div class="row"><span>isAtLiveEdge()</span><span id="s-edge">—</span></div>
+        <div class="row"><span>behindLiveBy()</span><span id="s-behind">—</span></div>
+        <div class="row"><span>dvrWindow()</span><span id="s-dvr">—</span></div>
+        <div class="row"><span>liveStart() → liveEdge()</span><span id="s-range">—</span></div>
+        <div class="row"><span>scrubber shown</span><span id="s-scrub">—</span></div>
+        <div class="row"><span>last onSeekToLive</span><span id="s-jump">never</span></div>
+        <div class="row"><span>raw video.duration</span><span id="r-dur">—</span></div>
+        <div class="row"><span>raw seekable</span><span id="r-seek">—</span></div>
+        <div class="row"><span>raw buffered</span><span id="r-buf">—</span></div>
+    </div>
+
+    <script type="module">
+        import {
+            PeekPlayer, isLiveVideo, isAtLiveEdge, behindLiveBy,
+            dvrWindow, liveStart, liveEdge
+        } from '../dist/peekplayer.esm.js';
+
+        const params = new URLSearchParams(location.search);
+        const SRC = params.get('src')
+            || 'https://demo.unified-streaming.com/k8s/live/stable/live.isml/.m3u8';
+
+        const wrapper = document.querySelector('.peekplayer-wrapper');
+        const video = wrapper.querySelector('.peekplayer-video');
+
+        /**
+         * Present a finite local file as live, for working offline.
+         *
+         * Overrides exactly what the player reads — `duration` and `seekable` —
+         * so the badge, the DVR scrubber and the time display all behave as
+         * they would on a real stream.
+         */
+        function simulateLive() {
+            let edge = 600;
+            Object.defineProperty(video, 'duration', { configurable: true, get: () => Infinity });
+            Object.defineProperty(video, 'seekable', {
+                configurable: true,
+                get: () => ({ length: 1, start: () => Math.max(0, edge - 300), end: () => edge })
+            });
+            // The edge advances in real time, so falling behind is reachable.
+            setInterval(() => { edge += 1; video.dispatchEvent(new Event('progress')); }, 1000);
+            video.dispatchEvent(new Event('durationchange'));
+        }
+
+        const player = new PeekPlayer({
+            videoElement: video,
+            controlsContainer: wrapper.querySelector('.peekplayer-controls'),
+            overlayContainer: wrapper.querySelector('.peekplayer-overlay'),
+            playerWrapper: wrapper,
+            onSeekToLive: (behindBy) => {
+                document.getElementById('s-jump').textContent =
+                    `jumped forward ${behindBy.toFixed(1)}s`;
+            }
+        });
+
+        const fmt = (n) => Number.isFinite(n) ? `${n.toFixed(1)}s` : '—';
+        const bool = (el, v) => {
+            el.textContent = v ? 'true' : 'false';
+            el.className = v ? 'yes' : 'no';
+        };
+
+        function refresh() {
+            bool(document.getElementById('s-live'), isLiveVideo(video));
+            bool(document.getElementById('s-edge'), isAtLiveEdge(video));
+            document.getElementById('s-behind').textContent = fmt(behindLiveBy(video));
+            document.getElementById('s-dvr').textContent = fmt(dvrWindow(video));
+            const a = liveStart(video), b = liveEdge(video);
+            document.getElementById('s-range').textContent =
+                a === null ? '—' : `${a.toFixed(0)} → ${b.toFixed(0)}`;
+            document.getElementById('r-dur').textContent = String(video.duration);
+            const sk = video.seekable;
+            document.getElementById('r-seek').textContent = sk && sk.length
+                ? `len=${sk.length} ${sk.start(0)} → ${sk.end(sk.length - 1)}`
+                : 'empty';
+            const bf = video.buffered;
+            document.getElementById('r-buf').textContent = bf && bf.length
+                ? `len=${bf.length} ${bf.start(0).toFixed(1)} → ${bf.end(bf.length - 1).toFixed(1)}`
+                : 'empty';
+            const row = wrapper.querySelector('.scrubber-row');
+            document.getElementById('s-scrub').textContent =
+                row ? (row.hidden ? 'hidden (no DVR)' : 'visible') : '—';
+        }
+        setInterval(refresh, 500);
+
+        try {
+            if (params.get('simulate') === '1') {
+                await player.loadSources([{ url: '../tests/fixtures/sample.mp4', quality: 'Auto' }]);
+                video.addEventListener('loadedmetadata', simulateLive, { once: true });
+            } else {
+                await player.loadSources([{ url: SRC, quality: 'Auto' }]);
+            }
+            refresh();
+        } catch (error) {
+            console.error('Failed to initialize PeekPlayer:', error);
+        }
+
+        window.player = player;
+    </script>
+</body>
+</html>

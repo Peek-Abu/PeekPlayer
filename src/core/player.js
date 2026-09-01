@@ -563,7 +563,8 @@ export class PeekPlayer {
       'onSkip',
       'onPipChange',
       'onQualityChange',
-      'onSubtitleChange'
+      'onSubtitleChange',
+      'onSeekToLive'
     ];
 
     const callbacks = callbackKeys.reduce((acc, key) => {

@@ -31,29 +31,44 @@ export function isLiveVideo(video) {
 }
 
 /**
- * The furthest point currently available, or null when nothing is seekable yet.
+ * Read one end of a TimeRanges, or null when it is missing or not finite.
+ *
+ * @param {TimeRanges | undefined | null} ranges
+ * @param {'start' | 'end'} which
+ * @returns {number | null}
+ */
+function edgeOf(ranges, which) {
+  if (!ranges || ranges.length === 0) return null;
+  const value = which === 'start' ? ranges.start(0) : ranges.end(ranges.length - 1);
+  return Number.isFinite(value) ? value : null;
+}
+
+/**
+ * The furthest point currently available, or null when nothing is known yet.
+ *
+ * `seekable` is the correct source and is tried first, but it is not dependable
+ * on live streams: measured against a real MSE live stream it stayed empty for
+ * the whole session, and some browsers report `[0, Infinity]` once the media
+ * source duration is infinite. Either way the DVR window looked like zero and
+ * the scrubber hid itself on a stream that had several minutes of rewind.
+ * `buffered` is the fallback — narrower than the true window, but real.
  *
  * @param {HTMLVideoElement} video
  * @returns {number | null}
  */
 export function liveEdge(video) {
-  const seekable = video?.seekable;
-  if (!seekable || seekable.length === 0) return null;
-  const end = seekable.end(seekable.length - 1);
-  return Number.isFinite(end) ? end : null;
+  return edgeOf(video?.seekable, 'end') ?? edgeOf(video?.buffered, 'end');
 }
 
 /**
- * The seekable start of the DVR window, or null.
+ * The start of the DVR window, or null. See `liveEdge` for why `buffered`
+ * backs `seekable` up.
  *
  * @param {HTMLVideoElement} video
  * @returns {number | null}
  */
 export function liveStart(video) {
-  const seekable = video?.seekable;
-  if (!seekable || seekable.length === 0) return null;
-  const start = seekable.start(0);
-  return Number.isFinite(start) ? start : null;
+  return edgeOf(video?.seekable, 'start') ?? edgeOf(video?.buffered, 'start');
 }
 
 /**

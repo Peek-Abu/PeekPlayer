@@ -209,6 +209,33 @@ test.describe('live streams', () => {
     }, { start, end, currentTime });
   }
 
+  test('falls back to buffered when seekable is empty', async ({ page }) => {
+    // Measured against a real MSE live stream, `seekable` stayed empty for the
+    // whole session. Relying on it alone reported a zero DVR window and hid
+    // the scrubber on a stream that had minutes of rewind.
+    await openPlayer(page);
+    await page.evaluate(() => {
+      const video = window.player.video;
+      Object.defineProperty(video, 'duration', { configurable: true, get: () => Infinity });
+      Object.defineProperty(video, 'seekable', {
+        configurable: true,
+        get: () => ({ length: 0, start: () => 0, end: () => 0 })
+      });
+      Object.defineProperty(video, 'buffered', {
+        configurable: true,
+        get: () => ({ length: 1, start: () => 100, end: () => 400 })
+      });
+      video.dispatchEvent(new Event('durationchange'));
+    });
+    const state = await page.evaluate(() => ({
+      dvr: window.PeekPlayerLive.dvrWindow(window.player.video),
+      edge: window.PeekPlayerLive.liveEdge(window.player.video)
+    }));
+    expect(state.dvr).toBe(300);
+    expect(state.edge).toBe(400);
+    await expect(page.locator('.scrubber-row')).toBeVisible();
+  });
+
   test('badge is hidden for a normal file', async ({ page }) => {
     await openPlayer(page);
     await expect(page.locator('.live-badge')).toBeHidden();

@@ -12,6 +12,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - A `LIVE` badge with a pulsing red dot at the live edge, which becomes a `GO LIVE` button when the viewer falls behind; clicking it returns to the edge (landing just short of it, since seeking exactly to the edge stalls). Disable with `controls: { liveBadge: false }`; `onSeekToLive(behindBy)` reports the jump.
   - The scrubber now represents the DVR window rather than the whole timeline. Live `currentTime` sits inside an absolute `[start, edge]` range, so positions are mapped into and out of that window; previously `currentTime / Infinity` pinned the thumb at zero. Streams offering under 30s of rewind get no bar at all.
   - The time display drops the meaningless total (`Infinity` formatted as `0:00`) and shows how far behind the edge the viewer is.
+  - Live edge falls back to `buffered` when `seekable` is unusable. Measured against a real MSE live stream `seekable` stayed empty for the whole session, which reported a zero DVR window and hid the scrubber on a stream with minutes of rewind.
+  - `examples/live-example.html` — a live demo with a raw media-state readout, `?src=` override, and `?simulate=1` for working offline.
   - Exported helpers: `isLiveVideo`, `liveEdge`, `liveStart`, `dvrWindow`, `behindLiveBy`, `isAtLiveEdge`, `seekToLiveEdge`.
 - Frame-by-frame stepping: `,` steps back, `.` steps forward (auto-pauses); configurable via the new `frameRate` option (default 30fps)
 - Mouse-wheel volume control over the volume button/slider (5% steps)
