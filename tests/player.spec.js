@@ -381,4 +381,33 @@ test.describe('live streams', () => {
     expect(text).not.toBe('0:00');
     expect(text).toMatch(/^(-\d+:\d{2}|LIVE)$/);
   });
+  test('the time display stays negative while scrubbing a live stream', async ({ page }) => {
+    // The scrubber previews in window coordinates — seconds from the start of
+    // what the bar draws. Rendered raw, that put a positive number on screen
+    // mid-drag while the resting reading beside it counted back from the edge.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 800 });
+
+    const bar = page.locator('.segmented-scrubber');
+    const box = await bar.boundingBox();
+    const y = box.y + box.height / 2;
+
+    await page.mouse.move(box.x + box.width * 0.5, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.25, y);
+
+    const during = await page.locator('.time-display .current-time').textContent();
+    await page.mouse.up();
+
+    expect(during).toMatch(/^(-\d+:\d{2}|LIVE)$/);
+    expect(during).not.toMatch(/^\d/);   // never a bare positive time
+  });
+
+  test('the time display reads LIVE when level with the edge', async ({ page }) => {
+    // Falling back to formatTime(currentTime) here printed absolute media
+    // time — a large positive number at the very moment it should say LIVE.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 900 });
+    await expect(page.locator('.time-display .current-time')).toHaveText('LIVE');
+  });
 });
