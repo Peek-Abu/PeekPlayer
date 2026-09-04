@@ -28,7 +28,10 @@
     onSeek: (t, delta, percent) => window.__events.push(['seek', t, percent]),
     onVolumeChange: (v) => window.__events.push(['volume', v]),
   });
-  window.player.loadSource('./sample.mp4');
+  // `?src=` lets a test point the player at an HLS URL so the engine decision
+  // itself can be asserted. Defaults to the local clip.
+  const src = new URLSearchParams(location.search).get('src') || './sample.mp4';
+  window.player.loadSource(src);
 </script>
 </body>
 </html>

@@ -430,4 +430,57 @@ test.describe('live streams', () => {
     expect(percent).toBeGreaterThan(0.4);
     expect(percent).toBeLessThan(0.6);
   });
+  test('an .m3u8 source drives hls.js, not the native path', async ({ page }) => {
+    // The regression this guards: player.js passed
+    // `useNativeIfSupported: options.engine !== 'hls'`, true for every caller
+    // that does not name an engine, so the native branch won. Chromium answers
+    // "maybe" for the HLS MIME type without being able to play it, so the
+    // element was handed a text playlist and hls.js was never constructed.
+    // The manifest 404s on purpose — the engine decision happens before any
+    // fetch, and this keeps the test off the network.
+    await page.goto('/tests/fixtures/player.html?src=./not-a-real-stream.m3u8');
+    await page.waitForFunction(() => window.player?.engine);
+
+    const state = await page.evaluate(() => ({
+      engine: window.player.engine?.constructor?.name ?? null,
+      hlsConstructed: !!window.player.engine?.hls,
+      // The native path assigns the playlist straight to the element.
+      srcIsPlaylist: /\.m3u8/.test(window.player.video.src || '')
+    }));
+
+    expect(state.engine).toBe('HLSWrapper');
+    expect(state.hlsConstructed).toBe(true);
+    expect(state.srcIsPlaylist).toBe(false);
+  });
+
+  test('an unrecoverable source is eventually abandoned, not retried forever', async ({ page }) => {
+    // The property worth guarding: without a cap, a source that never comes
+    // back has `startLoad()` fired at it in a tight loop for as long as the
+    // page is open.
+    //
+    // Only the cap is asserted. The other half of the design — that progress
+    // (FRAG_LOADED / LEVEL_LOADED / MANIFEST_PARSED) restores the budget — is
+    // not covered here: the fixture manifest 404s, so hls.js runs its own
+    // retry loop, and synthetic errors interleave with real ones in a way that
+    // makes an exact tally unpredictable. Stubbing the recovery calls and
+    // stopping the loader did not fully quiet it. That path is verified by
+    // reading, not by execution.
+    await page.goto('/tests/fixtures/player.html?src=./not-a-real-stream.m3u8');
+    await page.waitForFunction(() => window.player?.engine?.hls);
+
+    const gaveUp = await page.evaluate(async () => {
+      const video = window.player.video;
+      const hls = window.player.engine.hls;
+      let count = 0;
+      video.addEventListener('peekplayer:fatal-error', () => { count++; });
+
+      for (let i = 0; i < 12; i++) {
+        hls.trigger('hlsError', { fatal: true, type: 'networkError', details: 'synthetic' });
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      return count;
+    });
+
+    expect(gaveUp).toBeGreaterThan(0);
+  });
 });

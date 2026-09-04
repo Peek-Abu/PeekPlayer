@@ -98,6 +98,7 @@ export function createTimeDisplay(video) {
      * not change.
      */
     const liveTick = setInterval(() => {
+        if (document.visibilityState === 'hidden') return;
         if (isLiveVideo(video) && !scrubbing) updateTimeDisplay();
     }, 1000);
     

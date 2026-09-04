@@ -33,9 +33,12 @@ export class HLSWrapper {
      * `canPlayType` alone is not enough to decide this. Chromium answers
      * "maybe" for application/vnd.apple.mpegurl despite having no native HLS,
      * so preferring native on a truthy answer handed Chrome a text playlist as
-     * `video.src` and playback died with DEMUXER_ERROR_COULD_NOT_PARSE. hls.js
-     * therefore wins wherever it can run, and native is the fallback — the
-     * order hls.js's own documentation recommends.
+     * `video.src` and playback died with DEMUXER_ERROR_COULD_NOT_PARSE.
+     *
+     * Native is therefore taken in exactly two cases: hls.js cannot run (iOS
+     * Safari, where `Hls.isSupported()` is false for want of MSE), or the
+     * caller asked for it with `engine: 'native'`. Otherwise hls.js drives —
+     * the order hls.js's own documentation recommends.
      */
     if ((!hlsJsUsable || this.useNativeIfSupported) && this.video.canPlayType('application/vnd.apple.mpegurl')) {
       this.logger.log('🎬 Using native HLS support');
@@ -62,10 +65,12 @@ export class HLSWrapper {
         // Live tuning. lowLatencyMode stays off by default — it is a real
         // win on streams that publish partial segments and a source of
         // stalling on the many that do not. Callers opt in via hlsConfig.
-        // A caller's own hlsConfig is spread over these, so passing either of
-        // them replaces the default outright — including liveDurationInfinity,
-        // which is what makes `duration` report Infinity and is how the rest
-        // of the player recognises a live source at all.
+        // A caller's own hlsConfig is spread over these, so passing the same
+        // key replaces the default outright. That matters most for
+        // liveDurationInfinity: it is what makes `duration` report Infinity,
+        // which is how every live helper here recognises a live source. Pass
+        // `liveDurationInfinity: false` and live detection goes quiet — no
+        // badge, no DVR scrubber, a "0:00" total — with nothing to say why.
         liveSyncDurationCount: 3,
         liveDurationInfinity: true,
         // Debug mode
@@ -159,7 +164,15 @@ export class HLSWrapper {
       // error every time we retry, so recovery has to give up eventually
       // rather than hammer a dead origin forever.
       let recoveryAttempts = 0;
-      this.hls.on(Hls.Events.FRAG_LOADED, () => { recoveryAttempts = 0; });
+      // Any sign of progress clears the count. Resetting only on FRAG_LOADED
+      // was too strict: on a flaky live edge a handful of network errors can
+      // land without a fragment completing in between, and the cap would then
+      // give up on a stream that was still reachable. A playlist that reloads
+      // is progress too.
+      const noteProgress = () => { recoveryAttempts = 0; };
+      this.hls.on(Hls.Events.FRAG_LOADED, noteProgress);
+      this.hls.on(Hls.Events.LEVEL_LOADED, noteProgress);
+      this.hls.on(Hls.Events.MANIFEST_PARSED, noteProgress);
 
       const giveUp = (data) => {
         this.logger.error('🎬 Unrecoverable HLS error');

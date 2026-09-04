@@ -168,6 +168,12 @@ export function liveWindow(video) {
   const end = liveEdge(video);
   if (end === null) return { offset: 0, length: 0, live: true };
 
+  // Whichever region is larger, because both are genuinely reachable: the
+  // manifest says what the source will re-serve, and anything still in the
+  // buffer can be seeked to even after it has rolled off the playlist. Taking
+  // the manifest window unconditionally would hide buffered media the viewer
+  // can actually reach; taking `buffered` alone understates a long window down
+  // to whatever happens to be downloaded.
   const bufferedStart = liveStart(video) ?? end;
   const fromEngine = engineDvrWindows.get(video) || 0;
   const start = fromEngine > (end - bufferedStart)

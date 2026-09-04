@@ -55,8 +55,11 @@ export function createLiveBadge(video, options = {}) {
     badge.classList.toggle('is-at-edge', atEdge);
     badge.classList.toggle('is-behind', !atEdge);
     label.textContent = atEdge ? 'LIVE' : 'GO LIVE';
-    // Only actionable when there is somewhere to go.
-    badge.disabled = atEdge;
+    // aria-disabled rather than `disabled`: the real attribute drops the
+    // button out of the tab order, so reaching the edge silently threw away
+    // keyboard focus and the viewer had to tab from the top to get it back.
+    // handleClick already ignores a press at the edge.
+    badge.setAttribute('aria-disabled', atEdge ? 'true' : 'false');
     badge.setAttribute(
       'aria-label',
       atEdge ? 'Playing live' : `Behind live by ${Math.round(behindLiveBy(video))} seconds. Jump to live.`
@@ -89,7 +92,10 @@ export function createLiveBadge(video, options = {}) {
    * badge could read LIVE, and stay disabled, while the gap grew — the same
    * staleness the time display had.
    */
-  const tick = setInterval(() => { if (live()) render(); }, 1000);
+  const tick = setInterval(() => {
+    if (document.visibilityState === 'hidden') return;
+    if (live()) render();
+  }, 1000);
 
   badge.addEventListener('click', handleClick);
   video.addEventListener('timeupdate', render);
