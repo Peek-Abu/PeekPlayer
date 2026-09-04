@@ -2,6 +2,7 @@ import { createTooltip } from '../components/tooltip/tooltip.js';
 import { ICONS } from '../constants/icons.js';
 import { TOOLTIP_CONFIG } from '../constants/tooltip-config.js';
 import { TIMING } from '../constants/timing.js';
+import { clampSeek, liveWindow } from '../utils/live.js';
 
 export function createSecondsSkipButtons(video, onSeek, options = {}) {
     // Skip backward 10 seconds button
@@ -33,10 +34,15 @@ export function createSecondsSkipButtons(video, onSeek, options = {}) {
     
     // Event handlers
     const seekWithGuard = (targetTime) => {
-        const newTime = Math.max(0, targetTime);
+        // Clamped to what the source can serve. On live that is the DVR
+        // window: forward used to clamp to MAX_SAFE_INTEGER, which on a live
+        // stream means far past the end of the broadcast, and backward to 0,
+        // which is before the window even begins. Both stall.
+        const newTime = clampSeek(video, targetTime);
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
-        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        const { offset, length } = liveWindow(video);
+        const percent = length > 0 ? (newTime - offset) / length : 0;
         if (onSeek) onSeek(newTime, delta, percent);
     };
 
@@ -47,8 +53,7 @@ export function createSecondsSkipButtons(video, onSeek, options = {}) {
     
     skipForwardBtn.onclick = (e) => {
         e.stopPropagation();
-        const maxTime = Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER;
-        seekWithGuard(Math.min(maxTime, video.currentTime + TIMING.SKIP_SECONDS));
+        seekWithGuard(video.currentTime + TIMING.SKIP_SECONDS);
     };
     
     return {

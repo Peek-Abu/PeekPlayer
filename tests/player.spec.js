@@ -179,3 +179,308 @@ test.describe('keyboard', () => {
     await page.waitForFunction(() => window.player.video.paused);
   });
 });
+
+test.describe('live streams', () => {
+  /**
+   * Present the loaded fixture as a live stream.
+   *
+   * A real live source would mean a network dependency, which this suite
+   * deliberately avoids. What the player actually reads is `duration` and
+   * `seekable`, so overriding those exercises every code path that matters:
+   * `Infinity` duration is what marks a stream live, and the seekable range is
+   * the DVR window the scrubber and badge are built from.
+   */
+  async function makeLive(page, { start = 0, end = 600, currentTime = 595 } = {}) {
+    await page.evaluate(({ start, end, currentTime }) => {
+      const video = window.player.video;
+      Object.defineProperty(video, 'duration', { configurable: true, get: () => Infinity });
+      Object.defineProperty(video, 'seekable', {
+        configurable: true,
+        get: () => ({ length: 1, start: () => start, end: () => end })
+      });
+      let time = currentTime;
+      Object.defineProperty(video, 'currentTime', {
+        configurable: true,
+        get: () => time,
+        set: (v) => { time = v; video.dispatchEvent(new Event('seeked')); }
+      });
+      video.dispatchEvent(new Event('durationchange'));
+      video.dispatchEvent(new Event('timeupdate'));
+    }, { start, end, currentTime });
+  }
+
+  test('falls back to buffered when seekable is empty', async ({ page }) => {
+    // Measured against a real MSE live stream, `seekable` stayed empty for the
+    // whole session. Relying on it alone reported a zero DVR window and hid
+    // the scrubber on a stream that had minutes of rewind.
+    await openPlayer(page);
+    await page.evaluate(() => {
+      const video = window.player.video;
+      Object.defineProperty(video, 'duration', { configurable: true, get: () => Infinity });
+      Object.defineProperty(video, 'seekable', {
+        configurable: true,
+        get: () => ({ length: 0, start: () => 0, end: () => 0 })
+      });
+      Object.defineProperty(video, 'buffered', {
+        configurable: true,
+        get: () => ({ length: 1, start: () => 100, end: () => 400 })
+      });
+      video.dispatchEvent(new Event('durationchange'));
+    });
+    const state = await page.evaluate(() => ({
+      dvr: window.PeekPlayerLive.dvrWindow(window.player.video),
+      edge: window.PeekPlayerLive.liveEdge(window.player.video)
+    }));
+    expect(state.dvr).toBe(300);
+    expect(state.edge).toBe(400);
+    await expect(page.locator('.scrubber-row')).toBeVisible();
+  });
+
+  test('badge is hidden for a normal file', async ({ page }) => {
+    await openPlayer(page);
+    await expect(page.locator('.live-badge')).toBeHidden();
+  });
+
+  test('shows LIVE at the edge, and does not offer a jump', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { end: 600, currentTime: 597 });
+    const badge = page.locator('.live-badge');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText(/LIVE/);
+    await expect(badge).toHaveClass(/is-at-edge/);
+    await expect(badge).toBeDisabled();
+  });
+
+  test('offers GO LIVE when behind, and clicking returns to the edge', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { end: 600, currentTime: 400 });
+    const badge = page.locator('.live-badge');
+    await expect(badge).toHaveClass(/is-behind/);
+    await expect(badge).toHaveText(/GO LIVE/);
+    await expect(badge).toBeEnabled();
+
+    await badge.click();
+
+    // Lands just behind the edge on purpose: seeking exactly to it stalls.
+    const time = await page.evaluate(() => window.player.video.currentTime);
+    expect(time).toBeGreaterThan(595);
+    expect(time).toBeLessThanOrEqual(600);
+    await expect(badge).toHaveClass(/is-at-edge/);
+  });
+
+  test('time display drops the total and reports how far behind', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { end: 600, currentTime: 540 });
+    await expect(page.locator('.time-display .total-time')).toBeHidden();
+    // 60s behind the edge.
+    await expect(page.locator('.time-display .current-time')).toHaveText('-1:00');
+  });
+
+  test('scrubber is hidden when the stream offers no rewind', async ({ page }) => {
+    await openPlayer(page);
+    await makeLive(page, { start: 592, end: 600, currentTime: 599 });
+    await expect(page.locator('.scrubber-row')).toBeHidden();
+  });
+
+  test('scrubber maps position into the DVR window, not absolute time', async ({ page }) => {
+    await openPlayer(page);
+    // Halfway through a 600s window that starts at 300.
+    await makeLive(page, { start: 300, end: 900, currentTime: 600 });
+    await expect(page.locator('.scrubber-row')).toBeVisible();
+    const percent = await page.evaluate(() => {
+      const el = document.querySelector('.segmented-scrubber');
+      return Number(el.getAttribute('aria-valuenow'));
+    });
+    // Absolute time would read 600; window-relative is 300 of 600.
+    expect(percent).toBeGreaterThan(250);
+    expect(percent).toBeLessThan(350);
+  });
+  test('a forward skip stops at the live edge', async ({ page }) => {
+    // Forward used to clamp to MAX_SAFE_INTEGER, which on a live stream means
+    // far past the end of the broadcast — the seek lands in a segment that
+    // does not exist yet and playback stalls.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 600, currentTime: 595 });
+    await page.locator('.skip-forward').click();
+    const time = await page.evaluate(() => window.player.video.currentTime);
+    expect(time).toBeGreaterThan(595);
+    expect(time).toBeLessThanOrEqual(600);
+  });
+
+  test('a backward skip stops at the start of the DVR window', async ({ page }) => {
+    // Backward clamped to 0, which is before a live window begins — those
+    // segments have already rolled off the playlist.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 600, currentTime: 305 });
+    await page.locator('.skip-back').click();
+    const time = await page.evaluate(() => window.player.video.currentTime);
+    expect(time).toBeGreaterThanOrEqual(300);
+    expect(time).toBeLessThan(305);
+  });
+
+  test('clampSeek keeps VOD behaviour unchanged', async ({ page }) => {
+    await openPlayer(page);
+    const result = await page.evaluate(() => {
+      const v = window.player.video;
+      return {
+        past: window.PeekPlayerLive.clampSeek(v, v.duration + 999),
+        before: window.PeekPlayerLive.clampSeek(v, -50),
+        duration: v.duration
+      };
+    });
+    expect(result.past).toBeCloseTo(result.duration, 3);
+    expect(result.before).toBe(0);
+  });
+
+  test('the scrubber announces distance from live, not elapsed seconds', async ({ page }) => {
+    // "10:01" tells a screen-reader user nothing on a rolling window.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 800 });
+    const text = await page.getAttribute('.segmented-scrubber', 'aria-valuetext');
+    expect(text).toMatch(/behind live|^Live$/);
+  });
+
+  test('the time display keeps counting while paused on a live stream', async ({ page }) => {
+    // The edge advances whether or not the viewer is playing, so a paused
+    // reading goes stale — observed sitting at "-0:04" while the real gap had
+    // grown past forty seconds.
+    await openPlayer(page);
+    await makeLive(page, { start: 0, end: 600, currentTime: 590 });
+    const before = await page.locator('.time-display .current-time').textContent();
+
+    // Move the edge without emitting timeupdate, exactly as a paused live
+    // stream does while it keeps buffering.
+    await page.evaluate(() => {
+      const video = window.player.video;
+      Object.defineProperty(video, 'seekable', {
+        configurable: true,
+        get: () => ({ length: 1, start: () => 0, end: () => 660 })
+      });
+    });
+    await page.waitForTimeout(1500);
+    const after = await page.locator('.time-display .current-time').textContent();
+    expect(after).not.toBe(before);
+  });
+  test('the scrubber tooltip reads distance from live, not Infinity', async ({ page }) => {
+    // The tooltip computed `percent * video.duration`, and a live stream's
+    // duration is Infinity — every position produced Infinity, which the
+    // formatter swallowed into "0:00". It also assumed the bar spans
+    // 0..duration, wrong for a window that neither starts at zero nor stays put.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 800 });
+
+    const bar = page.locator('.segmented-scrubber');
+    const box = await bar.boundingBox();
+    // Halfway along the bar: 300s into a 600s window, so 300s behind the edge.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+    await page.mouse.move(box.x + box.width / 2 + 2, box.y + box.height / 2);
+
+    const time = page.locator('.tooltip--scrubber .tooltip__time');
+    await expect(time).toBeVisible();
+    const text = await time.textContent();
+    expect(text).not.toBe('0:00');
+    expect(text).toMatch(/^(-\d+:\d{2}|LIVE)$/);
+  });
+  test('the time display stays negative while scrubbing a live stream', async ({ page }) => {
+    // The scrubber previews in window coordinates — seconds from the start of
+    // what the bar draws. Rendered raw, that put a positive number on screen
+    // mid-drag while the resting reading beside it counted back from the edge.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 800 });
+
+    const bar = page.locator('.segmented-scrubber');
+    const box = await bar.boundingBox();
+    const y = box.y + box.height / 2;
+
+    await page.mouse.move(box.x + box.width * 0.5, y);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width * 0.25, y);
+
+    const during = await page.locator('.time-display .current-time').textContent();
+    await page.mouse.up();
+
+    expect(during).toMatch(/^(-\d+:\d{2}|LIVE)$/);
+    expect(during).not.toMatch(/^\d/);   // never a bare positive time
+  });
+
+  test('the time display reads LIVE when level with the edge', async ({ page }) => {
+    // Falling back to formatTime(currentTime) here printed absolute media
+    // time — a large positive number at the very moment it should say LIVE.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 900 });
+    await expect(page.locator('.time-display .current-time')).toHaveText('LIVE');
+  });
+  test('a keyboard seek reports its position within the DVR window', async ({ page }) => {
+    // percent came from `newTime / video.duration`, which is Infinity on live,
+    // so the finite-guard fell through and reported 0 for every keyboard seek
+    // — a listener saw the viewer pinned to the start of the window wherever
+    // they actually went. The skip buttons already did this correctly.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 600 });
+    await focusInsidePlayer(page);
+    await page.evaluate(() => { window.__events.length = 0; });
+
+    await page.keyboard.press('ArrowRight');   // +10s, to 610 of a 300..900 window
+
+    const percent = await page.evaluate(() => {
+      const seek = window.__events.filter(e => e[0] === 'seek').pop();
+      return seek ? seek[2] : null;
+    });
+    expect(percent).not.toBeNull();
+    expect(percent).toBeGreaterThan(0.4);
+    expect(percent).toBeLessThan(0.6);
+  });
+  test('an .m3u8 source drives hls.js, not the native path', async ({ page }) => {
+    // The regression this guards: player.js passed
+    // `useNativeIfSupported: options.engine !== 'hls'`, true for every caller
+    // that does not name an engine, so the native branch won. Chromium answers
+    // "maybe" for the HLS MIME type without being able to play it, so the
+    // element was handed a text playlist and hls.js was never constructed.
+    // The manifest 404s on purpose — the engine decision happens before any
+    // fetch, and this keeps the test off the network.
+    await page.goto('/tests/fixtures/player.html?src=./not-a-real-stream.m3u8');
+    await page.waitForFunction(() => window.player?.engine);
+
+    const state = await page.evaluate(() => ({
+      engine: window.player.engine?.constructor?.name ?? null,
+      hlsConstructed: !!window.player.engine?.hls,
+      // The native path assigns the playlist straight to the element.
+      srcIsPlaylist: /\.m3u8/.test(window.player.video.src || '')
+    }));
+
+    expect(state.engine).toBe('HLSWrapper');
+    expect(state.hlsConstructed).toBe(true);
+    expect(state.srcIsPlaylist).toBe(false);
+  });
+
+  test('an unrecoverable source is eventually abandoned, not retried forever', async ({ page }) => {
+    // The property worth guarding: without a cap, a source that never comes
+    // back has `startLoad()` fired at it in a tight loop for as long as the
+    // page is open.
+    //
+    // Only the cap is asserted. The other half of the design — that progress
+    // (FRAG_LOADED / LEVEL_LOADED / MANIFEST_PARSED) restores the budget — is
+    // not covered here: the fixture manifest 404s, so hls.js runs its own
+    // retry loop, and synthetic errors interleave with real ones in a way that
+    // makes an exact tally unpredictable. Stubbing the recovery calls and
+    // stopping the loader did not fully quiet it. That path is verified by
+    // reading, not by execution.
+    await page.goto('/tests/fixtures/player.html?src=./not-a-real-stream.m3u8');
+    await page.waitForFunction(() => window.player?.engine?.hls);
+
+    const gaveUp = await page.evaluate(async () => {
+      const video = window.player.video;
+      const hls = window.player.engine.hls;
+      let count = 0;
+      video.addEventListener('peekplayer:fatal-error', () => { count++; });
+
+      for (let i = 0; i < 12; i++) {
+        hls.trigger('hlsError', { fatal: true, type: 'networkError', details: 'synthetic' });
+        await new Promise((r) => setTimeout(r, 0));
+      }
+      return count;
+    });
+
+    expect(gaveUp).toBeGreaterThan(0);
+  });
+});

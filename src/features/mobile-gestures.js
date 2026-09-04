@@ -1,4 +1,5 @@
 import { TIMING } from '../constants/timing.js';
+import { clampSeek } from '../utils/live.js';
 
 export function setupMobileGestures(video, playerWrapper, logger) {
     if (typeof window === 'undefined' || !('ontouchstart' in window)) return null; // Skip on desktop
@@ -29,12 +30,10 @@ export function setupMobileGestures(video, playerWrapper, logger) {
                 // Live scrubbing: recompute from the touch origin so the seek
                 // tracks the finger instead of latching at the threshold.
                 const seekAmount = deltaX / TIMING.SWIPE_PIXEL_TO_SECOND_RATIO;
-                const newTime = Math.max(0, seekBaseTime + seekAmount);
-                if (Number.isFinite(video.duration) && video.duration > 0) {
-                    video.currentTime = Math.min(newTime, video.duration);
-                } else {
-                    video.currentTime = newTime;
-                }
+                // Clamped to the servable region. `Number.isFinite(Infinity)`
+                // is false, so a live stream fell to the unclamped branch and
+                // a swipe could seek past the edge or before the window start.
+                video.currentTime = clampSeek(video, seekBaseTime + seekAmount);
                 
                 // Show seek indicator
                 showSeekIndicator(playerWrapper, seekAmount > 0 ? 'forward' : 'backward');

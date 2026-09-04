@@ -1,6 +1,15 @@
 import { createScrubberTooltip } from '../components/tooltip/tooltip.js';
 import { createSegmentedScrubber } from './segmented-scrubber.js';
 import { assertVideoElement, assertFunction } from '../utils/assert.js';
+import { liveWindow, noteEngineDvrWindow } from '../utils/live.js';
+
+/**
+ * Below this much rewind a live stream gets no scrubber at all.
+ *
+ * A bar representing eight seconds of DVR cannot be dragged anywhere useful,
+ * and drawing one invites viewers to try.
+ */
+const MIN_DVR_SECONDS = 30;
 
 export function createScrubberBar(video, onSeek, options = {}) {
     // Assert required parameters
@@ -19,11 +28,45 @@ export function createScrubberBar(video, onSeek, options = {}) {
     const getSegments = () => options.segments || [];
     const segmentGap = typeof options.segmentGap === 'number' ? options.segmentGap : 0.17;
 
+    /**
+     * The window the scrubber represents.
+     *
+     * VOD is the whole file. Live is the DVR window, which both moves forward
+     * and does not start at zero — so times are shifted into and out of it
+     * rather than passed through. Without this, live playback sat at a
+     * position of `currentTime / Infinity`, i.e. pinned at the far left.
+     */
+    /**
+     * The DVR window the manifest advertises, when hls.js has told us.
+     *
+     * Preferred over `buffered`, which only covers what has been downloaded —
+     * on a stream advertising several minutes of rewind that read as fifteen
+     * seconds, so the bar stayed hidden on streams that were perfectly
+     * seekable. hls.js will fetch older segments on a seek outside the
+     * buffer, so the manifest's window is the honest one.
+     */
+    // Recorded against the element so the tooltip and keyboard resolve the
+    // same window this bar is drawing.
+    const handleLiveState = (event) => {
+        noteEngineDvrWindow(video, event?.detail?.dvrWindow);
+        updateScrubber();
+    };
+    video.addEventListener('peekplayer:live-state', handleLiveState);
+
+    const timelineWindow = () => liveWindow(video);
+
     const segmentedScrubber = createSegmentedScrubber({
         getSegments,
         onSeek: (time, delta, percent) => {
-            video.currentTime = time;
-            if (onSeek) onSeek(time, delta, percent);
+            // `time` is window-relative; the video wants absolute media time.
+            video.currentTime = timelineWindow().offset + time;
+            if (onSeek) onSeek(video.currentTime, delta, percent);
+        },
+        describePosition: (windowTime, windowLength) => {
+            const { live } = liveWindow(video);
+            if (!live) return null;
+            const behind = Math.max(0, windowLength - windowTime);
+            return behind < 1 ? 'Live' : `${Math.round(behind)} seconds behind live`;
         },
         onScrubPreview: typeof options.onScrubPreview === 'function' ? options.onScrubPreview : null,
         onScrubStart: typeof options.onScrubStart === 'function' ? options.onScrubStart : null,
@@ -50,6 +93,17 @@ export function createScrubberBar(video, onSeek, options = {}) {
     interactiveElement.addEventListener('mouseleave', handleHoverLeave);
 
     const getBufferedEnd = () => {
+        const window = timelineWindow();
+        if (window.live) {
+            const { offset, length } = window;
+            if (!video.buffered?.length) return 0;
+            let maxEnd = 0;
+            for (let i = 0; i < video.buffered.length; i++) {
+                const end = video.buffered.end(i);
+                if (end > maxEnd) maxEnd = end;
+            }
+            return Math.min(Math.max(0, maxEnd - offset), length);
+        }
         if (!video.duration || !video.buffered?.length) return 0;
         let maxEnd = 0;
         for (let i = 0; i < video.buffered.length; i++) {
@@ -62,9 +116,18 @@ export function createScrubberBar(video, onSeek, options = {}) {
     };
 
     const updateScrubber = () => {
+        const { offset, length, live } = timelineWindow();
+
+        // A live stream with no meaningful rewind gets no bar.
+        if (live && length < MIN_DVR_SECONDS) {
+            bar.hidden = true;
+            return;
+        }
+        bar.hidden = false;
+
         segmentedScrubber.update({
-            currentTime: video.currentTime || 0,
-            duration: video.duration || 0,
+            currentTime: Math.max(0, (video.currentTime || 0) - offset),
+            duration: length,
             bufferedEnd: getBufferedEnd()
         });
         maybeAutoSkip(video.currentTime || 0);
@@ -109,6 +172,10 @@ export function createScrubberBar(video, onSeek, options = {}) {
         updateScrubber();
     };
 
+    const handleDurationChange = () => {
+        updateScrubber();
+    };
+
     const handleSeeked = () => {
         updateScrubber();
     };
@@ -118,6 +185,10 @@ export function createScrubberBar(video, onSeek, options = {}) {
     video.addEventListener('progress', handleProgress);
     video.addEventListener('loadedmetadata', handleLoadedMetadata);
     video.addEventListener('seeked', handleSeeked);
+    // A source turning out to be live only shows up as a duration change —
+    // Infinity replacing a finite value. Without this the bar kept whatever
+    // geometry it had when the metadata first loaded.
+    video.addEventListener('durationchange', handleDurationChange);
 
     const cleanup = () => {
         if (animationFrame) {
@@ -133,6 +204,8 @@ export function createScrubberBar(video, onSeek, options = {}) {
         video.removeEventListener('progress', handleProgress);
         video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         video.removeEventListener('seeked', handleSeeked);
+        video.removeEventListener('durationchange', handleDurationChange);
+        video.removeEventListener('peekplayer:live-state', handleLiveState);
     };
 
     function resetAutoSkipState() {

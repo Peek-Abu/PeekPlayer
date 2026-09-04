@@ -1,5 +1,21 @@
 import { TIMING } from '../constants/timing.js';
+import { clampSeek, liveWindow } from '../utils/live.js';
+
 import { toggleFullscreen as toggleFullscreenWithFallback } from '../utils/fullscreen.js';
+
+/**
+ * Where a seek target sits within the region the bar represents, 0..1.
+ *
+ * Not `newTime / video.duration`: that is Infinity on a live stream, so the
+ * guard fell through and reported 0 for every keyboard seek — a listener
+ * watching `onSeek` saw the viewer pinned to the start of the window no matter
+ * where they actually went. The skip buttons already worked this way; the
+ * keyboard was missed.
+ */
+function seekPercent(video, newTime) {
+  const { offset, length } = liveWindow(video);
+  return length > 0 ? (newTime - offset) / length : 0;
+}
 
 export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOptions = {}) {
     const VOLUME_STEP = 0.1;
@@ -96,14 +112,13 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
             if (hooks.onPlaybackChange) hooks.onPlaybackChange(false);
         }
         const frameSeconds = 1 / (extraOptions.frameRate || TIMING.DEFAULT_FRAME_RATE);
-        const duration = Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER;
-        const newTime = Math.min(duration, Math.max(0, video.currentTime + count * frameSeconds));
+        const newTime = clampSeek(video, video.currentTime + count * frameSeconds);
         if (newTime === video.currentTime) {
             return;
         }
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
-        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        const percent = seekPercent(video, newTime);
         if (hooks.onSeek) hooks.onSeek(newTime, delta, percent);
     }
     
@@ -118,18 +133,18 @@ export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOpt
     }
     
     function skipBackward() {
-        const newTime = Math.max(0, video.currentTime - TIMING.SKIP_SECONDS);
+        const newTime = clampSeek(video, video.currentTime - TIMING.SKIP_SECONDS);
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
-        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        const percent = seekPercent(video, newTime);
         if (hooks.onSeek) hooks.onSeek(newTime, delta, percent);
     }
     
     function skipForward() {
-        const newTime = Math.min(Number.isFinite(video.duration) ? video.duration : Number.MAX_SAFE_INTEGER, video.currentTime + TIMING.SKIP_SECONDS);
+        const newTime = clampSeek(video, video.currentTime + TIMING.SKIP_SECONDS);
         const delta = newTime - video.currentTime;
         video.currentTime = newTime;
-        const percent = Number.isFinite(video.duration) && video.duration > 0 ? newTime / video.duration : 0;
+        const percent = seekPercent(video, newTime);
         if (hooks.onSeek) hooks.onSeek(newTime, delta, percent);
     }
     

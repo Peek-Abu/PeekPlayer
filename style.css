@@ -715,3 +715,78 @@ button:focus {
 .seek-indicator {
   will-change: opacity, transform;
 }
+
+/* The row sets its own display, which beats the user-agent `[hidden]` rule —
+   so hiding it from JS needs saying explicitly. Live streams with no DVR
+   window hide the bar entirely. */
+.scrubber-row[hidden] {
+  display: none;
+}
+
+/* ============================ live badge ============================
+   Shown only on live streams. Two states: on the edge it is a static
+   readout with a pulsing red dot; behind it, it becomes the button that
+   takes you back to now. */
+
+.live-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 4px;
+  margin-left: 6px;
+  border: 0;
+  background: transparent;
+  color: #fff;
+  font: 600 11px/1 system-ui, -apple-system, sans-serif;
+  letter-spacing: 0.08em;
+  pointer-events: auto;
+  cursor: default;
+}
+
+.live-badge[hidden] {
+  display: none;
+}
+
+.live-badge-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #888;
+  flex: none;
+}
+
+/* At the edge: the red dot viewers read as "this is happening now". */
+.live-badge.is-at-edge .live-badge-dot {
+  background: #ff3d3d;
+  animation: peekplayer-live-pulse 2s ease-in-out infinite;
+}
+
+/* Behind the edge: actionable. No outline — the dimmed dot and the changed
+   label already say it, and a bordered pill sat oddly among controls that are
+   all borderless. */
+.live-badge.is-behind {
+  cursor: pointer;
+  color: rgba(255, 255, 255, 0.7);
+}
+
+.live-badge.is-behind:hover,
+.live-badge.is-behind:focus-visible {
+  color: #fff;
+}
+
+.live-badge.is-behind:hover .live-badge-dot {
+  background: #ff3d3d;
+}
+
+.live-badge:disabled {
+  cursor: default;
+}
+
+@keyframes peekplayer-live-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.45; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .live-badge.is-at-edge .live-badge-dot { animation: none; }
+}

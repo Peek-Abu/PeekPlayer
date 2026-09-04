@@ -15,17 +15,23 @@
   <div id="controls"></div>
 </div>
 <script type="module">
-  import PeekPlayer from '../../dist/peekplayer.esm.js';
+  import PeekPlayer, { dvrWindow, liveEdge, isLiveVideo, isAtLiveEdge, behindLiveBy, clampSeek, liveWindow } from '../../dist/peekplayer.esm.js';
+  // Exposed for the live tests, and doubles as a check that the helpers are
+  // actually reachable from the built bundle.
+  window.PeekPlayerLive = { dvrWindow, liveEdge, isLiveVideo, isAtLiveEdge, behindLiveBy, clampSeek, liveWindow };
   window.__events = [];
   window.player = new PeekPlayer({
     videoElement: document.getElementById('video'),
     controlsContainer: document.getElementById('controls'),
     playerWrapper: document.getElementById('wrapper'),
     onPlaybackChange: (p) => window.__events.push(['playback', p]),
-    onSeek: (t) => window.__events.push(['seek', t]),
+    onSeek: (t, delta, percent) => window.__events.push(['seek', t, percent]),
     onVolumeChange: (v) => window.__events.push(['volume', v]),
   });
-  window.player.loadSource('./sample.mp4');
+  // `?src=` lets a test point the player at an HLS URL so the engine decision
+  // itself can be asserted. Defaults to the local clip.
+  const src = new URLSearchParams(location.search).get('src') || './sample.mp4';
+  window.player.loadSource(src);
 </script>
 </body>
 </html>
