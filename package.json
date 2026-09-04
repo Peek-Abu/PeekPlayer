@@ -56,7 +56,7 @@
     "@playwright/test": "^1.62.1",
     "@rollup/plugin-node-resolve": "^15.2.3",
     "@rollup/plugin-terser": "^0.4.4",
-    "eslint": "^9.39.5",
+    "eslint": "^10.9.1",
     "globals": "^16.5.0",
     "hls.js": ">=1.5.20",
     "http-server": "^14.1.1",
