@@ -25,7 +25,7 @@
     controlsContainer: document.getElementById('controls'),
     playerWrapper: document.getElementById('wrapper'),
     onPlaybackChange: (p) => window.__events.push(['playback', p]),
-    onSeek: (t) => window.__events.push(['seek', t]),
+    onSeek: (t, delta, percent) => window.__events.push(['seek', t, percent]),
     onVolumeChange: (v) => window.__events.push(['volume', v]),
   });
   window.player.loadSource('./sample.mp4');

@@ -410,4 +410,24 @@ test.describe('live streams', () => {
     await makeLive(page, { start: 300, end: 900, currentTime: 900 });
     await expect(page.locator('.time-display .current-time')).toHaveText('LIVE');
   });
+  test('a keyboard seek reports its position within the DVR window', async ({ page }) => {
+    // percent came from `newTime / video.duration`, which is Infinity on live,
+    // so the finite-guard fell through and reported 0 for every keyboard seek
+    // — a listener saw the viewer pinned to the start of the window wherever
+    // they actually went. The skip buttons already did this correctly.
+    await openPlayer(page);
+    await makeLive(page, { start: 300, end: 900, currentTime: 600 });
+    await focusInsidePlayer(page);
+    await page.evaluate(() => { window.__events.length = 0; });
+
+    await page.keyboard.press('ArrowRight');   // +10s, to 610 of a 300..900 window
+
+    const percent = await page.evaluate(() => {
+      const seek = window.__events.filter(e => e[0] === 'seek').pop();
+      return seek ? seek[2] : null;
+    });
+    expect(percent).not.toBeNull();
+    expect(percent).toBeGreaterThan(0.4);
+    expect(percent).toBeLessThan(0.6);
+  });
 });
