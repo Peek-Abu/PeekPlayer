@@ -1,5 +1,14 @@
 import Hls from 'hls.js';
 
+/**
+ * Consecutive recovery attempts allowed before playback is declared dead.
+ *
+ * Reset whenever a fragment actually loads, so a long broadcast that hiccups
+ * repeatedly keeps recovering; the cap only catches a source that never comes
+ * back.
+ */
+const MAX_RECOVERY_ATTEMPTS = 5;
+
 // Native HLS Engine Wrapper
 export class HLSWrapper {
   constructor(videoElement, hlsConfig = {}, logger, options = {}) {
@@ -141,27 +150,46 @@ export class HLSWrapper {
         }));
       });
 
+      // Recovery attempts since the last time anything actually loaded. A
+      // stream that is simply gone — a 403, a pulled channel — reports a fatal
+      // error every time we retry, so recovery has to give up eventually
+      // rather than hammer a dead origin forever.
+      let recoveryAttempts = 0;
+      this.hls.on(Hls.Events.FRAG_LOADED, () => { recoveryAttempts = 0; });
+
+      const giveUp = (data) => {
+        this.logger.error('🎬 Unrecoverable HLS error');
+        this.video.dispatchEvent(new CustomEvent('peekplayer:fatal-error', { detail: data }));
+      };
+
       this.hls.on(Hls.Events.ERROR, (event, data) => {
         this.logger.error('🎬 HLS Error:', data);
         if (!data?.fatal) return;
+
+        const recoverable =
+          data.type === Hls.ErrorTypes.NETWORK_ERROR || data.type === Hls.ErrorTypes.MEDIA_ERROR;
+        if (!recoverable) {
+          giveUp(data);
+          return;
+        }
+
+        if (recoveryAttempts >= MAX_RECOVERY_ATTEMPTS) {
+          this.logger.error(`🎬 Giving up after ${recoveryAttempts} recovery attempts`);
+          giveUp(data);
+          return;
+        }
+        recoveryAttempts++;
 
         // Live streams drop segments routinely — a flaky origin, a mid-stream
         // rendition change, a network blip. Without recovery a single fatal
         // error ends playback for good, which on a live stream means the
         // viewer has simply lost the broadcast.
-        switch (data.type) {
-          case Hls.ErrorTypes.NETWORK_ERROR:
-            this.logger.warn('🎬 Fatal network error, restarting load');
-            this.hls.startLoad();
-            break;
-          case Hls.ErrorTypes.MEDIA_ERROR:
-            this.logger.warn('🎬 Fatal media error, recovering');
-            this.hls.recoverMediaError();
-            break;
-          default:
-            this.logger.error('🎬 Unrecoverable HLS error');
-            this.video.dispatchEvent(new CustomEvent('peekplayer:fatal-error', { detail: data }));
-            break;
+        if (data.type === Hls.ErrorTypes.NETWORK_ERROR) {
+          this.logger.warn(`🎬 Fatal network error, restarting load (${recoveryAttempts}/${MAX_RECOVERY_ATTEMPTS})`);
+          this.hls.startLoad();
+        } else {
+          this.logger.warn(`🎬 Fatal media error, recovering (${recoveryAttempts}/${MAX_RECOVERY_ATTEMPTS})`);
+          this.hls.recoverMediaError();
         }
       });
       this.hls.on(Hls.Events.SUBTITLE_TRACKS_UPDATED, (_evt, data) => {
