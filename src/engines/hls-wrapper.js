@@ -62,6 +62,10 @@ export class HLSWrapper {
         // Live tuning. lowLatencyMode stays off by default — it is a real
         // win on streams that publish partial segments and a source of
         // stalling on the many that do not. Callers opt in via hlsConfig.
+        // A caller's own hlsConfig is spread over these, so passing either of
+        // them replaces the default outright — including liveDurationInfinity,
+        // which is what makes `duration` report Infinity and is how the rest
+        // of the player recognises a live source at all.
         liveSyncDurationCount: 3,
         liveDurationInfinity: true,
         // Debug mode

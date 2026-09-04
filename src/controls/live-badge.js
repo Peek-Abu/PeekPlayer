@@ -83,6 +83,14 @@ export function createLiveBadge(video, options = {}) {
     render();
   }
 
+  /**
+   * The edge advances whether or not the video is playing, so a paused viewer
+   * keeps falling behind while `timeupdate` stays silent. Without this the
+   * badge could read LIVE, and stay disabled, while the gap grew — the same
+   * staleness the time display had.
+   */
+  const tick = setInterval(() => { if (live()) render(); }, 1000);
+
   badge.addEventListener('click', handleClick);
   video.addEventListener('timeupdate', render);
   video.addEventListener('durationchange', render);
@@ -96,6 +104,7 @@ export function createLiveBadge(video, options = {}) {
   return {
     element: badge,
     cleanup: () => {
+      clearInterval(tick);
       badge.removeEventListener('click', handleClick);
       video.removeEventListener('timeupdate', render);
       video.removeEventListener('durationchange', render);

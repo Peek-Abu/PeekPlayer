@@ -1,6 +1,8 @@
 import { TIMING } from '../constants/timing.js';
 import { clampSeek, liveWindow } from '../utils/live.js';
 
+import { toggleFullscreen as toggleFullscreenWithFallback } from '../utils/fullscreen.js';
+
 /**
  * Where a seek target sits within the region the bar represents, 0..1.
  *
@@ -14,7 +16,6 @@ function seekPercent(video, newTime) {
   const { offset, length } = liveWindow(video);
   return length > 0 ? (newTime - offset) / length : 0;
 }
-import { toggleFullscreen as toggleFullscreenWithFallback } from '../utils/fullscreen.js';
 
 export function setupKeyboardControls(video, hooks = {}, playerWrapper, extraOptions = {}) {
     const VOLUME_STEP = 0.1;

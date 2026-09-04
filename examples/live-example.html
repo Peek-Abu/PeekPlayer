@@ -31,6 +31,7 @@
         Use <code>?simulate=1</code> to fake a live source from a local file — no network needed,
         useful when the demo stream is down or you are offline.
         Starts muted, because browsers only autoplay muted video — click the player to unmute.
+        Serve this page over HTTP (<code>npm run serve</code>); ES module imports do not work from <code>file://</code>.
     </p>
 
     <div class="peekplayer-wrapper">
@@ -81,14 +82,27 @@
          * they would on a real stream.
          */
         function simulateLive() {
-            let edge = 600;
             Object.defineProperty(video, 'duration', { configurable: true, get: () => Infinity });
+
+            // The edge is anchored to playback rather than to a fixed number.
+            // Pinning it at 600 while the file started at 0 left the viewer a
+            // permanent ten minutes behind, so the page reported "-10:00"
+            // forever and never showed the near-live state it claims to.
+            const EDGE_GAP = 2;      // seconds of headroom, as a real stream has
+            const WINDOW = 300;      // simulated DVR depth
+            let highWater = EDGE_GAP;
+            const edge = () => {
+                // Monotonic: a real edge never moves backwards, even if the
+                // viewer scrubs back.
+                highWater = Math.max(highWater, (video.currentTime || 0) + EDGE_GAP);
+                return highWater;
+            };
             Object.defineProperty(video, 'seekable', {
                 configurable: true,
-                get: () => ({ length: 1, start: () => Math.max(0, edge - 300), end: () => edge })
+                get: () => ({ length: 1, start: () => Math.max(0, edge() - WINDOW), end: () => edge() })
             });
-            // The edge advances in real time, so falling behind is reachable.
-            setInterval(() => { edge += 1; video.dispatchEvent(new Event('progress')); }, 1000);
+            // Keeps the readout live while paused, when no timeupdate fires.
+            setInterval(() => video.dispatchEvent(new Event('progress')), 1000);
             video.dispatchEvent(new Event('durationchange'));
         }
 

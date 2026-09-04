@@ -162,4 +162,8 @@ export declare function dvrWindow(video: HTMLVideoElement): number;
 export declare function behindLiveBy(video: HTMLVideoElement): number;
 export declare function isAtLiveEdge(video: HTMLVideoElement, tolerance?: number): boolean;
 export declare function seekToLiveEdge(video: HTMLVideoElement, safetyGap?: number): boolean;
+/** The span of media a viewer can move around in: the whole file on VOD, the DVR window on live. */
+export declare function liveWindow(video: HTMLVideoElement): { offset: number; length: number; live: boolean };
+/** Keep a seek inside what the source can actually serve. */
+export declare function clampSeek(video: HTMLVideoElement, seconds: number): number;
 export declare const LIVE_EDGE_TOLERANCE: number;
